@@ -25,6 +25,15 @@
         "body_path": "input.prompt",
         "placeholder": "Describe the music you want to generate...",
         "required": true
+      },
+      {
+        "name": "duration",
+        "type": "float",
+        "ui": "slider",
+        "body_path": "input.duration",
+        "min": 1,
+        "max": 180,
+        "default": 10
       }
     ]
   },
