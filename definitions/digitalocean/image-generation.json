@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "id": "do-flux-schnell",
+  "id": "do-image-generation",
   "provider": "digitalocean",
-  "name": "FLUX.1 Schnell (Image Generation)",
+  "name": "DigitalOcean Image Generation",
   "description": "Text-to-image generation via DigitalOcean GenAI",
   "auth": {
     "type": "header",
@@ -14,10 +14,18 @@
     "url": "https://inference.do-ai.run/v1/async-invoke",
     "content_type": "application/json",
     "body_template": {
-      "model_id": "fal-ai/flux/schnell",
       "input": {}
     },
     "params": [
+      {
+        "name": "model",
+        "type": "enum",
+        "options": ["fal-ai/flux/schnell", "fal-ai/fast-sdxl"],
+        "default": "fal-ai/flux/schnell",
+        "ui": "dropdown",
+        "body_path": "model_id",
+        "required": true
+      },
       {
         "name": "prompt",
         "type": "string",
@@ -40,19 +48,19 @@
   "examples": [
     {
       "label": "Space cat",
-      "params": { "prompt": "A cat astronaut floating in space, photorealistic, 8k, dramatic lighting" }
+      "params": { "prompt": "A cat astronaut floating in space, photorealistic, 8k, dramatic lighting", "model": "fal-ai/flux/schnell" }
     },
     {
       "label": "Mountain sunset",
-      "params": { "prompt": "A mountain landscape at sunset, oil painting style, vibrant colors" }
+      "params": { "prompt": "A mountain landscape at sunset, oil painting style, vibrant colors", "model": "fal-ai/flux/schnell" }
     },
     {
       "label": "Cyberpunk city",
-      "params": { "prompt": "A futuristic cyberpunk city at night, neon signs, rain-soaked streets, blade runner style" }
+      "params": { "prompt": "A futuristic cyberpunk city at night, neon signs, rain-soaked streets, blade runner style", "model": "fal-ai/fast-sdxl" }
     },
     {
       "label": "Studio portrait",
-      "params": { "prompt": "Professional studio portrait of a golden retriever wearing reading glasses, soft lighting" }
+      "params": { "prompt": "Professional studio portrait of a golden retriever wearing reading glasses, soft lighting", "model": "fal-ai/fast-sdxl" }
     }
   ],
   "response": {

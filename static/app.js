@@ -354,7 +354,11 @@ async function onGenerate() {
             } else {
                 // Sync response
                 lastResponse = data.response;
-                renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}]);
+                if (data.outputs && data.outputs.length > 0) {
+                    renderOutputs(data.outputs);
+                } else {
+                    renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}]);
+                }
                 setGenerating(false);
             }
         } catch (e) {
@@ -544,6 +548,9 @@ function renderOutputs(outputs) {
                 case 'image':
                     container.appendChild(createImageRenderer(val, output.downloadable));
                     break;
+                case 'video':
+                    container.appendChild(createVideoRenderer(val, output.downloadable));
+                    break;
                 case 'audio':
                     container.appendChild(createAudioRenderer(val, output.downloadable));
                     break;
@@ -574,6 +581,32 @@ function createImageRenderer(url, downloadable) {
         const link = document.createElement('a');
         link.href = url;
         link.download = 'generated-image';
+        link.target = '_blank';
+        link.className = 'inline-block text-xs text-gray-500 hover:text-gray-300 transition-colors';
+        link.textContent = 'Download';
+        div.appendChild(link);
+    }
+
+    return div;
+}
+
+function createVideoRenderer(url, downloadable) {
+    const div = document.createElement('div');
+    div.className = 'space-y-3';
+
+    const video = document.createElement('video');
+    video.controls = true;
+    video.autoplay = true;
+    video.className = 'max-w-full rounded-md';
+    const source = document.createElement('source');
+    source.src = url;
+    video.appendChild(source);
+    div.appendChild(video);
+
+    if (downloadable) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'generated-video';
         link.target = '_blank';
         link.className = 'inline-block text-xs text-gray-500 hover:text-gray-300 transition-colors';
         link.textContent = 'Download';

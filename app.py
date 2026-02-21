@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 
@@ -136,9 +137,18 @@ def generate():
             url=url,
             headers=headers,
             json=body,
-            timeout=30,
+            timeout=60,
         )
-        resp_data = resp.json()
+
+        # Handle binary audio responses (TTS endpoints return raw audio)
+        content_type = resp.headers.get("Content-Type", "")
+        if resp.ok and ("audio" in content_type or "octet-stream" in content_type):
+            audio_b64 = base64.b64encode(resp.content).decode("utf-8")
+            mime = content_type.split(";")[0].strip()
+            data_url = f"data:{mime};base64,{audio_b64}"
+            resp_data = {"audio_url": data_url}
+        else:
+            resp_data = resp.json()
     except http_requests.RequestException as e:
         return jsonify({"error": str(e), "sent_request": sent_request}), 502
     except ValueError:
@@ -152,6 +162,12 @@ def generate():
         rid_path = interaction.get("request_id_path", "$.request_id")
         request_id = extract_value(resp_data, rid_path)
         result["request_id"] = request_id
+
+    # For sync responses, extract typed outputs (images, audio, etc.)
+    if resp.ok and interaction.get("pattern") not in ("polling", "streaming"):
+        outputs = extract_outputs(defn, resp_data)
+        if outputs:
+            result["outputs"] = outputs
 
     # Check for provider errors
     if not resp.ok:

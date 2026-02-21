@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "id": "do-elevenlabs-tts",
+  "id": "do-audio-generation",
   "provider": "digitalocean",
-  "name": "ElevenLabs TTS (Text to Speech)",
-  "description": "Text-to-speech via ElevenLabs on DigitalOcean GenAI",
+  "name": "DigitalOcean Audio Generation",
+  "description": "Text-to-speech and text-to-audio via DigitalOcean GenAI",
   "auth": {
     "type": "header",
     "header": "Authorization",
@@ -14,17 +14,31 @@
     "url": "https://inference.do-ai.run/v1/async-invoke",
     "content_type": "application/json",
     "body_template": {
-      "model_id": "fal-ai/elevenlabs/tts/multilingual-v2",
       "input": {}
     },
     "params": [
       {
+        "name": "model",
+        "type": "enum",
+        "options": ["fal-ai/elevenlabs/tts/multilingual-v2", "fal-ai/stable-audio-25/text-to-audio"],
+        "default": "fal-ai/elevenlabs/tts/multilingual-v2",
+        "ui": "dropdown",
+        "body_path": "model_id",
+        "required": true
+      },
+      {
         "name": "text",
         "type": "string",
         "ui": "textarea",
-        "required": true,
         "body_path": "input.text",
-        "placeholder": "Hello, welcome to arcade..."
+        "placeholder": "Text to speak (ElevenLabs TTS)..."
+      },
+      {
+        "name": "prompt",
+        "type": "string",
+        "ui": "textarea",
+        "body_path": "input.prompt",
+        "placeholder": "Music description (Stable Audio)..."
       },
       {
         "name": "voice",
@@ -32,7 +46,6 @@
         "options": ["Rachel", "Aria", "Roger", "Sarah", "Laura", "Charlie", "George", "Callum", "River", "Liam", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill"],
         "default": "Rachel",
         "ui": "dropdown",
-        "required": true,
         "body_path": "input.voice"
       },
       {
@@ -41,7 +54,6 @@
         "options": ["en", "es", "fr", "de", "it", "pt", "pl", "hi", "ja", "zh"],
         "default": "en",
         "ui": "dropdown",
-        "required": true,
         "body_path": "input.language"
       }
     ]
@@ -58,19 +70,19 @@
   "examples": [
     {
       "label": "Welcome message",
-      "params": { "text": "Welcome to arcade, the universal AI playground. Pick any endpoint, and the UI builds itself.", "voice": "Rachel", "language": "en" }
+      "params": { "text": "Welcome to arcade, the universal AI playground. Pick any endpoint, and the UI builds itself.", "voice": "Rachel", "language": "en", "model": "fal-ai/elevenlabs/tts/multilingual-v2" }
     },
     {
       "label": "News anchor",
-      "params": { "text": "Breaking news tonight. Scientists have discovered a new species of deep-sea fish that communicates using bioluminescent patterns.", "voice": "Roger", "language": "en" }
+      "params": { "text": "Breaking news tonight. Scientists have discovered a new species of deep-sea fish that communicates using bioluminescent patterns.", "voice": "Roger", "language": "en", "model": "fal-ai/elevenlabs/tts/multilingual-v2" }
     },
     {
-      "label": "Spanish greeting",
-      "params": { "text": "Hola, bienvenido a arcade. Este es un ejemplo de texto a voz en español.", "voice": "Laura", "language": "es" }
+      "label": "Synth wave",
+      "params": { "prompt": "Upbeat synthwave track with retro 80s vibes, pulsing bass, and shimmering arpeggios", "model": "fal-ai/stable-audio-25/text-to-audio" }
     },
     {
-      "label": "Storyteller",
-      "params": { "text": "Once upon a time, in a land where code came alive at midnight, a small Python script dreamed of becoming a full application.", "voice": "Daniel", "language": "en" }
+      "label": "Jazz piano",
+      "params": { "prompt": "Smooth jazz piano trio, upright bass, brushed drums, late night club atmosphere", "model": "fal-ai/stable-audio-25/text-to-audio" }
     }
   ],
   "response": {
