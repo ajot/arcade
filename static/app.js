@@ -21,9 +21,20 @@ const PROVIDER_NAMES = {
 };
 
 // ---------------------------------------------------------------------------
+// Type display names
+// ---------------------------------------------------------------------------
+
+const TYPE_NAMES = { text: 'Text', image: 'Image', audio: 'Audio', video: 'Video' };
+
+function typeName(type) {
+    return TYPE_NAMES[type] || type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+// ---------------------------------------------------------------------------
 // State — slot-based model
 // ---------------------------------------------------------------------------
 
+let selectedType = ''; // '' means "All"
 let mode = 'play'; // 'play' | 'compare'
 let logEntryCount = 0;
 
@@ -110,12 +121,45 @@ function abortAllSlots() {
 // API key toggle
 // ---------------------------------------------------------------------------
 
-function toggleApiKeyInput() {
-    const wrapper = document.getElementById('apiKeyWrapper');
-    wrapper.classList.toggle('hidden');
-    if (!wrapper.classList.contains('hidden')) {
-        document.getElementById('apiKey').focus();
+function getApiKey(provider) {
+    if (provider && typeof API_KEYS !== 'undefined' && API_KEYS[provider]) {
+        return API_KEYS[provider];
     }
+    return null;
+}
+
+function showApiKeyStatus(provider) {
+    const el = document.getElementById('apiKeyStatus');
+    if (!provider) {
+        el.classList.add('hidden');
+        return;
+    }
+    const name = PROVIDER_NAMES[provider] || provider;
+    if (getApiKey(provider)) {
+        el.textContent = `${name} key loaded`;
+        el.className = 'ml-auto text-xs text-green-600';
+    } else {
+        el.textContent = `${name} key missing \u2014 add to .env`;
+        el.className = 'ml-auto text-xs text-amber-500';
+    }
+    el.classList.remove('hidden');
+}
+
+function showCompareKeyStatus(side, provider) {
+    const el = document.getElementById(`compare${side}KeyStatus`);
+    if (!el) return;
+    if (!provider) {
+        el.classList.add('hidden');
+        return;
+    }
+    if (getApiKey(provider)) {
+        el.textContent = 'key loaded';
+        el.className = 'text-[10px] shrink-0 text-green-600';
+    } else {
+        el.textContent = 'no key';
+        el.className = 'text-[10px] shrink-0 text-amber-500';
+    }
+    el.classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -205,17 +249,15 @@ function setMode(newMode) {
     const modeCompare = document.getElementById('modeCompare');
     const playground = document.getElementById('playground');
 
-    const compareApiKeys = document.getElementById('compareApiKeys');
     const progressBar = document.getElementById('progressBar');
 
     if (mode === 'play') {
         mainCol.style.maxWidth = '720px';
-        mainCol.style.paddingTop = '6rem';
-        progressBar.style.top = '56px';
+        mainCol.style.paddingTop = '7.5rem';
+        progressBar.style.top = '96px';
         playPickers.classList.remove('hidden');
         comparePickers.classList.add('hidden');
         compareResults.classList.add('hidden');
-        compareApiKeys.classList.add('hidden');
         document.getElementById('compareSideParams').classList.add('hidden');
         modePlay.classList.add('text-white', 'bg-gray-800/50');
         modePlay.classList.remove('text-gray-600');
@@ -239,7 +281,6 @@ function setMode(newMode) {
         playPickers.classList.add('hidden');
         comparePickers.classList.remove('hidden');
         playResults.classList.add('hidden');
-        compareApiKeys.classList.remove('hidden');
         playground.classList.remove('hidden');
         modeCompare.classList.add('text-white', 'bg-gray-800/50');
         modeCompare.classList.remove('text-gray-600');
@@ -273,6 +314,7 @@ async function onDefinitionChange() {
     hideModelPicker();
     hideBaseUrl();
     hideSystemPromptGroup();
+    showApiKeyStatus(null);
 
     if (!id) {
         playground.classList.add('hidden');
@@ -297,18 +339,8 @@ async function onDefinitionChange() {
             showSystemPromptGroup();
         }
 
-        // Auto-fill API key
-        const provider = def.provider;
-        const keyInput = document.getElementById('apiKey');
-        const hint = document.getElementById('apiKeyHint');
-        if (typeof API_KEYS !== 'undefined' && API_KEYS[provider]) {
-            keyInput.value = API_KEYS[provider];
-            hint.textContent = `Key loaded from environment for ${provider}`;
-            hint.classList.remove('hidden');
-        } else {
-            hint.classList.add('hidden');
-            document.getElementById('apiKeyWrapper').classList.remove('hidden');
-        }
+        // Show API key status
+        showApiKeyStatus(def.provider);
 
         log(`Loaded: ${def.name}`, 'info');
     } catch (e) {
@@ -481,9 +513,9 @@ async function onGenerate() {
     const def = slots.play.definition;
     if (!def) return;
 
-    const apiKey = document.getElementById('apiKey').value.trim();
+    const apiKey = getApiKey(def.provider);
     if (!apiKey) {
-        showError('Please enter an API key.');
+        showError(`API key missing for ${PROVIDER_NAMES[def.provider] || def.provider}. Add it to your .env file.`);
         return;
     }
 
@@ -1059,16 +1091,100 @@ function hideModelPicker() {
 }
 
 // ---------------------------------------------------------------------------
-// Provider filtering (Play mode)
+// Type filtering
 // ---------------------------------------------------------------------------
 
-function onProviderChange() {
+function initTypeFilter() {
+    const types = [...new Set(DEFINITIONS_LIST.map(d => d.output_type).filter(Boolean))].sort();
+    const container = document.getElementById('typeFilter');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.textContent = 'All';
+    allBtn.dataset.type = '';
+    allBtn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors bg-gray-800 text-white';
+    allBtn.onclick = () => onTypeChange('');
+    container.appendChild(allBtn);
+
+    for (const t of types) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = typeName(t);
+        btn.dataset.type = t;
+        btn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors text-gray-500 hover:text-gray-300';
+        btn.onclick = () => onTypeChange(t);
+        container.appendChild(btn);
+    }
+}
+
+function onTypeChange(type) {
+    selectedType = type;
+
+    const container = document.getElementById('typeFilter');
+    if (container) {
+        for (const btn of container.children) {
+            if (btn.dataset.type === type) {
+                btn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors bg-gray-800 text-white';
+            } else {
+                btn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors text-gray-500 hover:text-gray-300';
+            }
+        }
+    }
+
+    filterByType();
+}
+
+function getFilteredDefinitions() {
+    return selectedType
+        ? DEFINITIONS_LIST.filter(d => d.output_type === selectedType)
+        : DEFINITIONS_LIST;
+}
+
+function filterByType() {
+    const filtered = getFilteredDefinitions();
+
+    // --- Play mode: rebuild provider dropdown ---
+    const providerPicker = document.getElementById('providerPicker');
+    const currentProvider = providerPicker.value;
+    const providers = [...new Set(filtered.map(d => d.provider))].sort();
+
+    providerPicker.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'All Providers';
+    providerPicker.appendChild(allOpt);
+    for (const slug of providers) {
+        const opt = document.createElement('option');
+        opt.value = slug;
+        opt.textContent = PROVIDER_NAMES[slug] || slug;
+        providerPicker.appendChild(opt);
+    }
+
+    // Keep provider selection if still valid
+    if (providers.includes(currentProvider)) {
+        providerPicker.value = currentProvider;
+    } else {
+        providerPicker.value = '';
+    }
+
+    // Rebuild endpoint dropdown respecting both type + provider
+    rebuildEndpointPicker();
+
+    // --- Compare mode: rebuild both sides ---
+    rebuildCompareProviders();
+}
+
+function rebuildEndpointPicker() {
     const providerSlug = document.getElementById('providerPicker').value;
     const picker = document.getElementById('definitionPicker');
+    const currentValue = picker.value;
 
-    const filtered = providerSlug
-        ? DEFINITIONS_LIST.filter(d => d.provider === providerSlug)
-        : DEFINITIONS_LIST;
+    let filtered = getFilteredDefinitions();
+    if (providerSlug) {
+        filtered = filtered.filter(d => d.provider === providerSlug);
+    }
 
     picker.innerHTML = '';
 
@@ -1078,7 +1194,9 @@ function onProviderChange() {
         opt.textContent = filtered[0].name;
         picker.appendChild(opt);
         picker.value = filtered[0].id;
-        onDefinitionChange();
+        if (currentValue !== filtered[0].id) {
+            onDefinitionChange();
+        }
     } else {
         const placeholder = document.createElement('option');
         placeholder.value = '';
@@ -1090,12 +1208,90 @@ function onProviderChange() {
             opt.textContent = d.name;
             picker.appendChild(opt);
         }
-        picker.value = '';
-        document.getElementById('playground').classList.add('hidden');
-        hideModelPicker();
-        hideBaseUrl();
-        slots.play.definition = null;
+        // Restore selection if still valid
+        if (filtered.some(d => d.id === currentValue)) {
+            picker.value = currentValue;
+        } else {
+            picker.value = '';
+            document.getElementById('playground').classList.add('hidden');
+            hideModelPicker();
+            hideBaseUrl();
+            slots.play.definition = null;
+        }
     }
+}
+
+function rebuildCompareProviders() {
+    const filtered = getFilteredDefinitions();
+    const providers = [...new Set(filtered.map(d => d.provider))].sort();
+
+    for (const side of ['Left', 'Right']) {
+        const providerPicker = document.getElementById(`compare${side}Provider`);
+        if (!providerPicker) continue;
+        const currentProvider = providerPicker.value;
+
+        providerPicker.innerHTML = '<option value="">Provider</option>';
+        for (const slug of providers) {
+            const opt = document.createElement('option');
+            opt.value = slug;
+            opt.textContent = PROVIDER_NAMES[slug] || slug;
+            providerPicker.appendChild(opt);
+        }
+
+        if (providers.includes(currentProvider)) {
+            providerPicker.value = currentProvider;
+        } else {
+            providerPicker.value = '';
+        }
+
+        // Rebuild endpoint dropdown for this side
+        rebuildCompareEndpointPicker(side);
+    }
+}
+
+function rebuildCompareEndpointPicker(side) {
+    const providerSlug = document.getElementById(`compare${side}Provider`).value;
+    const endpointPicker = document.getElementById(`compare${side}Endpoint`);
+    const currentValue = endpointPicker.value;
+    const slotId = side.toLowerCase();
+
+    const otherSide = side === 'Left' ? 'right' : 'left';
+    const otherDef = slots[otherSide].definition;
+    const otherType = otherDef ? getOutputTypeFromList(otherDef.id) : null;
+
+    let filtered = getFilteredDefinitions();
+    if (providerSlug) {
+        filtered = filtered.filter(d => d.provider === providerSlug);
+    }
+    if (otherType) {
+        filtered = filtered.filter(d => d.output_type === otherType);
+    }
+
+    endpointPicker.innerHTML = '<option value="">Endpoint</option>';
+    for (const d of filtered) {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        endpointPicker.appendChild(opt);
+    }
+
+    if (filtered.some(d => d.id === currentValue)) {
+        endpointPicker.value = currentValue;
+    } else {
+        endpointPicker.value = '';
+        slots[slotId].definition = null;
+        const modelPicker = document.getElementById(`compare${side}Model`);
+        modelPicker.innerHTML = '';
+        modelPicker.classList.add('hidden');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Provider filtering (Play mode)
+// ---------------------------------------------------------------------------
+
+function onProviderChange() {
+    rebuildEndpointPicker();
 }
 
 function initProviderPicker() {
@@ -1131,37 +1327,15 @@ function initCompareProviderPickers() {
 
 function onCompareProviderChange(side) {
     const providerSlug = document.getElementById(`compare${side}Provider`).value;
-    const endpointPicker = document.getElementById(`compare${side}Endpoint`);
     const modelPicker = document.getElementById(`compare${side}Model`);
-
-    endpointPicker.innerHTML = '<option value="">Endpoint</option>';
     modelPicker.innerHTML = '';
     modelPicker.classList.add('hidden');
-
-    const otherSide = side === 'Left' ? 'right' : 'left';
-    const otherDef = slots[otherSide].definition;
-    const otherType = otherDef ? getOutputTypeFromList(otherDef.id) : null;
-
-    let filtered = providerSlug
-        ? DEFINITIONS_LIST.filter(d => d.provider === providerSlug)
-        : DEFINITIONS_LIST;
-
-    // Filter to compatible output types if other side has a selection
-    if (otherType) {
-        filtered = filtered.filter(d => d.output_type === otherType);
-    }
-
-    for (const d of filtered) {
-        const opt = document.createElement('option');
-        opt.value = d.id;
-        opt.textContent = d.name;
-        endpointPicker.appendChild(opt);
-    }
 
     const slotId = side.toLowerCase();
     slots[slotId].definition = null;
 
-    updateCompareApiKey(side, providerSlug);
+    rebuildCompareEndpointPicker(side);
+    showCompareKeyStatus(side, providerSlug);
     checkCompareCompatibility();
 }
 
@@ -1184,10 +1358,11 @@ function filterOtherSideEndpoints(changedSide) {
         ? getOutputTypeFromList(changedSlot.definition.id)
         : null;
 
-    // Get base list filtered by provider
-    let candidates = otherProviderSlug
-        ? DEFINITIONS_LIST.filter(d => d.provider === otherProviderSlug)
-        : DEFINITIONS_LIST;
+    // Start from type-filtered list
+    let candidates = getFilteredDefinitions();
+    if (otherProviderSlug) {
+        candidates = candidates.filter(d => d.provider === otherProviderSlug);
+    }
 
     // Filter to compatible output types
     if (filterType) {
@@ -1242,10 +1417,9 @@ async function onCompareEndpointChange(side) {
             modelPicker.classList.remove('hidden');
         }
 
-        // Update API key
-        updateCompareApiKey(side, def.provider);
         // Filter other side's endpoints to compatible types
         filterOtherSideEndpoints(side);
+        showCompareKeyStatus(side, def.provider);
         log(`[${slotId}] Loaded: ${def.name}`, 'info');
     } catch (e) {
         log(`[${slotId}] Failed to load definition: ${e.message}`, 'error');
@@ -1256,15 +1430,6 @@ async function onCompareEndpointChange(side) {
     updateCompareForm();
 }
 
-function updateCompareApiKey(side, providerSlug) {
-    const keyInput = document.getElementById(`compare${side}ApiKey`);
-    if (!keyInput) return;
-    if (providerSlug && typeof API_KEYS !== 'undefined' && API_KEYS[providerSlug]) {
-        keyInput.value = API_KEYS[providerSlug];
-    } else {
-        keyInput.value = '';
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Compare mode — output type and compatibility
@@ -1347,8 +1512,8 @@ function updateCompareForm() {
     const container = document.getElementById('formFields');
     container.innerHTML = '';
 
-    // Hide examples in compare mode
-    document.getElementById('examplesRow').classList.add('hidden');
+    // Show merged examples from both definitions
+    renderCompareExamples(leftDef, rightDef);
 
     for (const param of shared) {
         if (param.name === 'model' && param.ui === 'dropdown') continue;
@@ -1369,6 +1534,39 @@ function updateCompareForm() {
             sideParamsContainer.classList.add('hidden');
         }
     }
+}
+
+function renderCompareExamples(leftDef, rightDef) {
+    const exRow = document.getElementById('examplesRow');
+    const exBtns = document.getElementById('exampleButtons');
+    exBtns.innerHTML = '';
+
+    // Collect examples from both definitions, deduplicate by label
+    const seen = new Set();
+    const examples = [];
+    for (const def of [leftDef, rightDef]) {
+        if (!def || !def.examples) continue;
+        for (const ex of def.examples) {
+            if (seen.has(ex.label)) continue;
+            seen.add(ex.label);
+            examples.push(ex);
+        }
+    }
+
+    if (examples.length === 0) {
+        exRow.classList.add('hidden');
+        return;
+    }
+
+    for (const example of examples) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-colors';
+        btn.textContent = example.label;
+        btn.onclick = () => fillExample(example.params);
+        exBtns.appendChild(btn);
+    }
+    exRow.classList.remove('hidden');
 }
 
 function computeSharedParams(leftDef, rightDef) {
@@ -1430,11 +1628,14 @@ async function onCompareGenerate() {
         return;
     }
 
-    const leftApiKey = document.getElementById('compareLeftApiKey').value.trim();
-    const rightApiKey = document.getElementById('compareRightApiKey').value.trim();
+    const leftApiKey = getApiKey(leftDef.provider);
+    const rightApiKey = getApiKey(rightDef.provider);
 
-    if (!leftApiKey || !rightApiKey) {
-        showError('API keys required for both sides.');
+    const missing = [];
+    if (!leftApiKey) missing.push(`Left (${PROVIDER_NAMES[leftDef.provider] || leftDef.provider})`);
+    if (!rightApiKey) missing.push(`Right (${PROVIDER_NAMES[rightDef.provider] || rightDef.provider})`);
+    if (missing.length > 0) {
+        showError(`API key missing for ${missing.join(' and ')}. Add to .env file.`);
         return;
     }
 
@@ -1623,5 +1824,6 @@ function startPollingAsync(slotId, requestId, apiKey, resolve) {
 // Initialization
 // ---------------------------------------------------------------------------
 
+initTypeFilter();
 initProviderPicker();
 initCompareProviderPickers();

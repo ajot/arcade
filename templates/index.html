@@ -11,7 +11,7 @@
 
     <!-- Top bar -->
     <header id="topBar" class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
-        <!-- Row 1: Brand + mode + play pickers + API key -->
+        <!-- Row 1: Brand + mode + type pills + key status -->
         <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 h-14">
             <span class="text-sm font-semibold text-white tracking-tight mr-2">arcade</span>
 
@@ -23,8 +23,15 @@
                         class="px-3 py-1 text-xs text-gray-600 transition-colors whitespace-nowrap">Compare</button>
             </div>
 
-            <!-- Play mode pickers -->
-            <div id="playPickers" class="flex items-center gap-4">
+            <!-- Type filter pills -->
+            <div id="typeFilter" class="flex items-center gap-1"></div>
+
+            <p id="apiKeyStatus" class="ml-auto text-xs text-gray-600 hidden"></p>
+        </div>
+
+        <!-- Row 2: Play mode pickers -->
+        <div id="playPickers" class="border-t border-gray-800/50">
+            <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
                 <select id="providerPicker" onchange="onProviderChange()"
                         class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
                     <option value="">All Providers</option>
@@ -43,19 +50,6 @@
                             class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
                     </select>
                 </div>
-            </div>
-
-            <div class="ml-auto flex items-center gap-2">
-                <button id="apiKeyToggle" onclick="toggleApiKeyInput()" class="text-gray-500 hover:text-gray-300 transition-colors" title="API Key">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                </button>
-                <div id="apiKeyWrapper" class="hidden">
-                    <input type="password" id="apiKey" placeholder="API key"
-                           class="bg-gray-900 border border-gray-800 rounded-md px-2 py-1 text-sm text-white w-48 focus:outline-none focus:border-blue-500">
-                </div>
-                <p id="apiKeyHint" class="text-xs text-gray-600 hidden"></p>
             </div>
         </div>
 
@@ -76,6 +70,7 @@
                     <select id="compareLeftModel"
                             class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
                     </select>
+                    <span id="compareLeftKeyStatus" class="text-[10px] hidden shrink-0"></span>
                 </div>
                 <span class="text-gray-700 text-xs shrink-0">vs</span>
                 <!-- Right side -->
@@ -92,18 +87,19 @@
                     <select id="compareRightModel"
                             class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
                     </select>
+                    <span id="compareRightKeyStatus" class="text-[10px] hidden shrink-0"></span>
                 </div>
             </div>
         </div>
     </header>
 
     <!-- Progress bar (top offset adjusts dynamically via JS) -->
-    <div id="progressBar" class="fixed left-0 right-0 z-30 hidden overflow-hidden" style="top: 56px;">
+    <div id="progressBar" class="fixed left-0 right-0 z-30 hidden overflow-hidden" style="top: 96px;">
         <div class="h-0.5 bg-blue-500 animate-progress"></div>
     </div>
 
     <!-- Main centered column -->
-    <main id="mainColumn" class="mx-auto px-6 pt-24 pb-24 transition-all duration-300" style="max-width: 720px;">
+    <main id="mainColumn" class="mx-auto px-6 pb-24 transition-all duration-300" style="max-width: 720px; padding-top: 7.5rem;">
 
         <!-- Endpoint info -->
         <div id="playground" class="hidden">
@@ -146,20 +142,6 @@
 
             <!-- Compare warning -->
             <p id="compareWarning" class="hidden mt-4 text-xs text-amber-400 border border-amber-900/50 rounded-md px-3 py-2"></p>
-
-            <!-- Compare mode API keys -->
-            <div id="compareApiKeys" class="hidden mt-5 grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Left API Key</label>
-                    <input type="password" id="compareLeftApiKey" placeholder="API key"
-                           class="w-full bg-gray-900 border border-gray-800 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Right API Key</label>
-                    <input type="password" id="compareRightApiKey" placeholder="API key"
-                           class="w-full bg-gray-900 border border-gray-800 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
-                </div>
-            </div>
 
             <!-- Generate button -->
             <div class="mt-6">
