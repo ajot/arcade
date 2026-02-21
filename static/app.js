@@ -84,13 +84,6 @@ function getJsonView(slotId) {
     return null;
 }
 
-function getJsonToggleBtn(slotId) {
-    if (slotId === 'play') return document.getElementById('jsonToggleBtn');
-    if (slotId === 'left') return document.getElementById('compareLeftJsonBtn');
-    if (slotId === 'right') return document.getElementById('compareRightJsonBtn');
-    return null;
-}
-
 function getErrorContainer(slotId) {
     if (slotId === 'play') return document.getElementById('errorDisplay');
     if (slotId === 'left') return document.getElementById('compareLeftError');
@@ -913,30 +906,257 @@ function renderRawFallback(data, slotId) {
 }
 
 // ---------------------------------------------------------------------------
-// JSON toggle — slot-aware
+// Curl builder — builds curl from definition + form params (no server call)
 // ---------------------------------------------------------------------------
 
-function toggleJson(slotId) {
-    slotId = slotId || 'play';
-    const view = getJsonView(slotId);
-    const btn = getJsonToggleBtn(slotId);
-    const slot = slots[slotId];
-    if (!view || !btn) return;
+function buildRequestPreview(definition, params) {
+    const req = definition.request;
+    const method = (req.method || 'POST').toUpperCase();
+    const url = req.url || '';
 
-    const isHidden = view.classList.contains('hidden');
-
-    if (isHidden) {
-        view.classList.remove('hidden');
-        btn.textContent = '[hide]';
-
-        const reqEl = view.querySelector('.json-request');
-        const resEl = view.querySelector('.json-response');
-        if (reqEl) reqEl.textContent = slot.lastSentRequest ? JSON.stringify(slot.lastSentRequest, null, 2) : 'No request captured';
-        if (resEl) resEl.textContent = slot.lastResponse ? JSON.stringify(slot.lastResponse, null, 2) : 'No response captured';
-    } else {
-        view.classList.add('hidden');
-        btn.textContent = '{ }';
+    // Build headers
+    const headers = { 'Content-Type': req.content_type || 'application/json' };
+    const auth = definition.auth || {};
+    if (auth.type === 'header') {
+        const prefix = auth.prefix || '';
+        headers[auth.header] = `${prefix}<API_KEY>`;
     }
+    for (const [k, v] of Object.entries(req.headers || {})) {
+        headers[k] = v;
+    }
+
+    // Build body
+    const body = JSON.parse(JSON.stringify(req.body_template || {}));
+    for (const paramDef of req.params || []) {
+        const name = paramDef.name;
+        if (!(name in params)) continue;
+        let value = params[name];
+
+        if (paramDef.type === 'integer') value = parseInt(value, 10);
+        else if (paramDef.type === 'float') value = parseFloat(value);
+
+        const bodyPath = paramDef.body_path;
+        if (bodyPath === '_chat_message') {
+            body.messages = [{ role: 'user', content: value }];
+        } else if (bodyPath) {
+            setNested(body, bodyPath, value);
+        } else {
+            body[name] = value;
+        }
+    }
+
+    // System prompt
+    const sysPrompt = params._system_prompt;
+    delete body._system_prompt;
+    if (body.messages && sysPrompt) {
+        body.messages.unshift({ role: 'system', content: sysPrompt });
+    }
+
+    return { method, url, headers, body };
+}
+
+function setNested(obj, path, value) {
+    const keys = path.split('.');
+    let current = obj;
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (!(keys[i] in current)) current[keys[i]] = {};
+        current = current[keys[i]];
+    }
+    current[keys[keys.length - 1]] = value;
+}
+
+function formatCurl(preview) {
+    const parts = [`curl -X ${preview.method} '${preview.url}'`];
+
+    for (const [key, value] of Object.entries(preview.headers)) {
+        parts.push(`  -H '${key}: ${value}'`);
+    }
+
+    if (preview.body && Object.keys(preview.body).length > 0) {
+        parts.push(`  -d '${JSON.stringify(preview.body, null, 2)}'`);
+    }
+
+    return parts.join(' \\\n');
+}
+
+function openCurlModal() {
+    const panel = document.getElementById('curlModalPanel');
+    const playBody = document.getElementById('curlPlayBody');
+    const compareBody = document.getElementById('curlCompareBody');
+    const playCopyBtn = document.getElementById('curlCopyBtnPlay');
+
+    playBody.classList.add('hidden');
+    compareBody.classList.add('hidden');
+    playCopyBtn.classList.add('hidden');
+
+    if (mode === 'play') {
+        const def = slots.play.definition;
+        if (!def) return;
+        const params = collectParams();
+        const preview = buildRequestPreview(def, params);
+        document.getElementById('curlPlayContent').textContent = formatCurl(preview);
+        playBody.classList.remove('hidden');
+        playCopyBtn.classList.remove('hidden');
+        panel.style.maxWidth = '42rem'; // max-w-2xl
+    } else {
+        for (const [slotId, side] of [['left', 'Left'], ['right', 'Right']]) {
+            const def = slots[slotId].definition;
+            const contentEl = document.getElementById(`curl${side}Content`);
+            const labelEl = document.getElementById(`curl${side}Label`);
+            if (!def) {
+                contentEl.textContent = '# (no endpoint selected)';
+                if (labelEl) labelEl.textContent = side;
+            } else {
+                const params = collectCompareParams(slotId);
+                const preview = buildRequestPreview(def, params);
+                contentEl.textContent = formatCurl(preview);
+                // Use provider + model label
+                const provider = PROVIDER_NAMES[def.provider] || def.provider;
+                const modelPicker = document.getElementById(`compare${side}Model`);
+                const modelVal = modelPicker && !modelPicker.classList.contains('hidden') ? modelPicker.value : '';
+                if (labelEl) labelEl.textContent = modelVal ? `${provider} · ${modelVal}` : provider;
+            }
+            // Reset copy button
+            const copyBtn = document.getElementById(`curlCopyBtn${side}`);
+            if (copyBtn) copyBtn.textContent = 'Copy';
+        }
+        compareBody.classList.remove('hidden');
+        panel.style.maxWidth = '64rem'; // wider for two columns
+    }
+
+    document.getElementById('curlModal').classList.remove('hidden');
+}
+
+function closeCurlModal() {
+    document.getElementById('curlModal').classList.add('hidden');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeCurlModal();
+});
+
+function copyJsonPre(btn) {
+    const pre = btn.closest('div').nextElementSibling;
+    if (!pre) return;
+    navigator.clipboard.writeText(pre.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    });
+}
+
+function copyCurl(target) {
+    let text, btn;
+    if (target === 'play') {
+        text = document.getElementById('curlPlayContent').textContent;
+        btn = document.getElementById('curlCopyBtnPlay');
+    } else if (target === 'left') {
+        text = document.getElementById('curlLeftContent').textContent;
+        btn = document.getElementById('curlCopyBtnLeft');
+    } else if (target === 'right') {
+        text = document.getElementById('curlRightContent').textContent;
+        btn = document.getElementById('curlCopyBtnRight');
+    }
+    if (!text || !btn) return;
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    });
+}
+
+function collectCompareParams(slotId) {
+    const side = slotId === 'left' ? 'Left' : 'Right';
+    const sharedParams = collectParams();
+
+    const modelPicker = document.getElementById(`compare${side}Model`);
+    if (modelPicker && !modelPicker.classList.contains('hidden') && modelPicker.value) {
+        sharedParams.model = modelPicker.value;
+    }
+
+    collectSideParams(side, sharedParams);
+    return sharedParams;
+}
+
+// ---------------------------------------------------------------------------
+// Result tabs — switch between Result and JSON panes
+// ---------------------------------------------------------------------------
+
+function switchResultTab(context, tab) {
+    // context: 'play' or 'compare'
+    const container = context === 'play'
+        ? document.getElementById('results')
+        : document.getElementById('compareResults');
+    if (!container) return;
+
+    const resultPane = document.getElementById(context === 'play' ? 'playResultPane' : 'compareResultPane');
+    const jsonPane = document.getElementById(context === 'play' ? 'playJsonPane' : 'compareJsonPane');
+
+    // Update tab buttons
+    const tabs = container.querySelectorAll('.result-tab');
+    for (const t of tabs) {
+        if (t.dataset.tab === tab) {
+            t.classList.add('result-tab-active');
+            t.classList.remove('text-gray-600', 'hover:text-gray-400');
+        } else {
+            t.classList.remove('result-tab-active');
+            t.classList.add('text-gray-600', 'hover:text-gray-400');
+        }
+    }
+
+    // Show/hide panes
+    if (tab === 'result') {
+        resultPane.classList.remove('hidden');
+        jsonPane.classList.add('hidden');
+    } else {
+        resultPane.classList.add('hidden');
+        jsonPane.classList.remove('hidden');
+        // Populate JSON when switching to this tab
+        if (context === 'play') {
+            populateJson('play');
+        } else {
+            populateJson('left');
+            populateJson('right');
+            // Sync labels
+            const leftLabel = document.getElementById('compareLeftLabel');
+            const leftJsonLabel = document.getElementById('compareLeftJsonLabel');
+            const rightLabel = document.getElementById('compareRightLabel');
+            const rightJsonLabel = document.getElementById('compareRightJsonLabel');
+            if (leftLabel && leftJsonLabel) leftJsonLabel.textContent = leftLabel.textContent;
+            if (rightLabel && rightJsonLabel) rightJsonLabel.textContent = rightLabel.textContent;
+        }
+    }
+}
+
+function populateJson(slotId) {
+    const view = getJsonView(slotId);
+    const slot = slots[slotId];
+    if (!view) return;
+
+    const reqEl = view.querySelector('.json-request');
+    const resEl = view.querySelector('.json-response');
+    if (reqEl) reqEl.textContent = slot.lastSentRequest ? JSON.stringify(slot.lastSentRequest, null, 2) : '';
+    if (resEl) resEl.textContent = slot.lastResponse ? JSON.stringify(slot.lastResponse, null, 2) : '';
+}
+
+function resetResultTabs(context) {
+    const container = context === 'play'
+        ? document.getElementById('results')
+        : document.getElementById('compareResults');
+    if (!container) return;
+    // Reset to Result tab
+    const tabs = container.querySelectorAll('.result-tab');
+    for (const t of tabs) {
+        if (t.dataset.tab === 'result') {
+            t.classList.add('result-tab-active');
+            t.classList.remove('text-gray-600', 'hover:text-gray-400');
+        } else {
+            t.classList.remove('result-tab-active');
+            t.classList.add('text-gray-600', 'hover:text-gray-400');
+        }
+    }
+    const resultPane = document.getElementById(context === 'play' ? 'playResultPane' : 'compareResultPane');
+    const jsonPane = document.getElementById(context === 'play' ? 'playJsonPane' : 'compareJsonPane');
+    if (resultPane) resultPane.classList.remove('hidden');
+    if (jsonPane) jsonPane.classList.add('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -985,12 +1205,9 @@ function showResults() {
 
 function hideResults() {
     document.getElementById('results').classList.add('hidden');
-    const jsonView = document.getElementById('jsonView');
-    if (jsonView) jsonView.classList.add('hidden');
-    const jsonBtn = document.getElementById('jsonToggleBtn');
-    if (jsonBtn) jsonBtn.textContent = '{ }';
     const metricsEl = document.getElementById('metricsRow');
     if (metricsEl) metricsEl.innerHTML = '';
+    resetResultTabs('play');
 }
 
 function showError(msg) {
@@ -1697,6 +1914,7 @@ async function onCompareGenerate() {
     const rightMetrics = getMetricsContainer('right');
     if (leftMetrics) leftMetrics.innerHTML = '';
     if (rightMetrics) rightMetrics.innerHTML = '';
+    resetResultTabs('compare');
     // Hide errors
     const leftErr = document.getElementById('compareLeftError');
     const rightErr = document.getElementById('compareRightError');

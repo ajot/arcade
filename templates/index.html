@@ -158,105 +158,133 @@
             <!-- Compare warning -->
             <p id="compareWarning" class="hidden mt-4 text-xs text-amber-400 border border-amber-900/50 rounded-md px-3 py-2"></p>
 
-            <!-- Generate button -->
-            <div class="mt-6">
+            <!-- Generate button + curl -->
+            <div class="mt-6 flex items-center justify-between">
                 <button id="generateBtn" onclick="onGenerate()"
                         class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors">
                     Generate
                 </button>
+                <button id="curlPreviewBtn" onclick="openCurlModal()"
+                        class="bg-yellow-500/15 hover:bg-yellow-500/25 text-yellow-400 text-xs font-medium px-3 py-1.5 rounded-full transition-colors">curl</button>
             </div>
         </div>
 
         <!-- Play mode Results -->
         <div id="results" class="hidden mt-10">
-            <div class="flex items-center justify-between mb-4">
-                <div class="h-px flex-1 bg-gray-800"></div>
-                <span class="px-3 text-xs text-gray-600 uppercase tracking-wider">Result</span>
-                <div class="h-px flex-1 bg-gray-800"></div>
+            <!-- Tabs -->
+            <div class="flex items-center gap-0 mb-4 border-b border-gray-800">
+                <button onclick="switchResultTab('play','result')" data-tab="result"
+                        class="result-tab result-tab-active px-4 py-2 text-xs uppercase tracking-wider transition-colors">Result</button>
+                <button onclick="switchResultTab('play','json')" data-tab="json"
+                        class="result-tab px-4 py-2 text-xs text-gray-600 uppercase tracking-wider transition-colors hover:text-gray-400">JSON</button>
             </div>
-            <div id="renderedOutput" class="space-y-4"></div>
-            <div id="metricsRow" class="mt-3"></div>
-            <div class="mt-4">
-                <button id="jsonToggleBtn" onclick="toggleJson('play')"
-                        class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">
-                    { }
-                </button>
+            <!-- Result pane -->
+            <div id="playResultPane">
+                <div id="renderedOutput" class="space-y-4"></div>
+                <div id="metricsRow" class="mt-3"></div>
             </div>
-            <div id="jsonView" class="hidden mt-3 space-y-3">
-                <div>
-                    <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
-                    <pre class="json-request bg-gray-900 rounded-md p-3 text-xs text-green-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
-                </div>
-                <div>
-                    <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
-                    <pre class="json-response bg-gray-900 rounded-md p-3 text-xs text-blue-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+            <!-- JSON pane -->
+            <div id="playJsonPane" class="hidden">
+                <div id="jsonView" class="space-y-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="text-xs text-gray-600 uppercase tracking-wider">Request</h4>
+                            <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
+                        </div>
+                        <pre class="json-request bg-gray-900 rounded-md p-3 text-xs text-green-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="text-xs text-gray-600 uppercase tracking-wider">Response</h4>
+                            <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
+                        </div>
+                        <pre class="json-response bg-gray-900 rounded-md p-3 text-xs text-blue-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Compare mode Results -->
         <div id="compareResults" class="hidden mt-10">
-            <div class="flex items-center justify-between mb-4">
-                <div class="h-px flex-1 bg-gray-800"></div>
-                <span class="px-3 text-xs text-gray-600 uppercase tracking-wider">Results</span>
-                <div class="h-px flex-1 bg-gray-800"></div>
+            <!-- Tabs -->
+            <div class="flex items-center gap-0 mb-4 border-b border-gray-800">
+                <button onclick="switchResultTab('compare','result')" data-tab="result"
+                        class="result-tab result-tab-active px-4 py-2 text-xs uppercase tracking-wider transition-colors">Result</button>
+                <button onclick="switchResultTab('compare','json')" data-tab="json"
+                        class="result-tab px-4 py-2 text-xs text-gray-600 uppercase tracking-wider transition-colors hover:text-gray-400">JSON</button>
             </div>
-            <div class="compare-grid grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Left column -->
-                <div class="compare-column">
-                    <div class="flex items-center justify-between mb-3">
-                        <span id="compareLeftLabel" class="text-xs text-gray-500 uppercase tracking-wider">Left</span>
-                    </div>
-                    <div id="compareLeftOutput" class="space-y-4 min-h-[60px]"></div>
-                    <div id="compareLeftMetrics" class="mt-3"></div>
-                    <!-- Left error -->
-                    <div id="compareLeftError" class="hidden mt-3">
-                        <div class="border border-red-900/50 rounded-md px-3 py-2">
-                            <p class="slot-error-msg text-red-400 text-xs"></p>
+            <!-- Result pane -->
+            <div id="compareResultPane">
+                <div class="compare-grid grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Left column -->
+                    <div class="compare-column">
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="compareLeftLabel" class="text-xs text-gray-500 uppercase tracking-wider">Left</span>
+                        </div>
+                        <div id="compareLeftOutput" class="space-y-4 min-h-[60px]"></div>
+                        <div id="compareLeftMetrics" class="mt-3"></div>
+                        <div id="compareLeftError" class="hidden mt-3">
+                            <div class="border border-red-900/50 rounded-md px-3 py-2">
+                                <p class="slot-error-msg text-red-400 text-xs"></p>
+                            </div>
                         </div>
                     </div>
-                    <!-- Left JSON -->
-                    <div class="mt-3">
-                        <button id="compareLeftJsonBtn" onclick="toggleJson('left')"
-                                class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">{ }</button>
-                    </div>
-                    <div id="compareLeftJsonView" class="hidden mt-2 space-y-2">
-                        <div>
-                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
-                            <pre class="json-request bg-gray-900 rounded-md p-2 text-xs text-green-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                    <!-- Right column -->
+                    <div class="compare-column">
+                        <div class="flex items-center justify-between mb-3">
+                            <span id="compareRightLabel" class="text-xs text-gray-500 uppercase tracking-wider">Right</span>
                         </div>
-                        <div>
-                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
-                            <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                        <div id="compareRightOutput" class="space-y-4 min-h-[60px]"></div>
+                        <div id="compareRightMetrics" class="mt-3"></div>
+                        <div id="compareRightError" class="hidden mt-3">
+                            <div class="border border-red-900/50 rounded-md px-3 py-2">
+                                <p class="slot-error-msg text-red-400 text-xs"></p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <!-- Right column -->
-                <div class="compare-column">
-                    <div class="flex items-center justify-between mb-3">
-                        <span id="compareRightLabel" class="text-xs text-gray-500 uppercase tracking-wider">Right</span>
-                    </div>
-                    <div id="compareRightOutput" class="space-y-4 min-h-[60px]"></div>
-                    <div id="compareRightMetrics" class="mt-3"></div>
-                    <!-- Right error -->
-                    <div id="compareRightError" class="hidden mt-3">
-                        <div class="border border-red-900/50 rounded-md px-3 py-2">
-                            <p class="slot-error-msg text-red-400 text-xs"></p>
+            </div>
+            <!-- JSON pane -->
+            <div id="compareJsonPane" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Left JSON -->
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2" id="compareLeftJsonLabel">Left</p>
+                        <div id="compareLeftJsonView" class="space-y-2">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="text-xs text-gray-600 uppercase tracking-wider">Request</h4>
+                                    <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
+                                </div>
+                                <pre class="json-request bg-gray-900 rounded-md p-2 text-xs text-green-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="text-xs text-gray-600 uppercase tracking-wider">Response</h4>
+                                    <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
+                                </div>
+                                <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                            </div>
                         </div>
                     </div>
                     <!-- Right JSON -->
-                    <div class="mt-3">
-                        <button id="compareRightJsonBtn" onclick="toggleJson('right')"
-                                class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">{ }</button>
-                    </div>
-                    <div id="compareRightJsonView" class="hidden mt-2 space-y-2">
-                        <div>
-                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
-                            <pre class="json-request bg-gray-900 rounded-md p-2 text-xs text-green-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
-                        </div>
-                        <div>
-                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
-                            <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2" id="compareRightJsonLabel">Right</p>
+                        <div id="compareRightJsonView" class="space-y-2">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="text-xs text-gray-600 uppercase tracking-wider">Request</h4>
+                                    <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
+                                </div>
+                                <pre class="json-request bg-gray-900 rounded-md p-2 text-xs text-green-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="text-xs text-gray-600 uppercase tracking-wider">Response</h4>
+                                    <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
+                                </div>
+                                <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -271,6 +299,49 @@
         </div>
 
     </main>
+
+    <!-- Curl modal -->
+    <div id="curlModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60" onclick="closeCurlModal()"></div>
+        <div id="curlModalPanel" class="relative bg-gray-900 border border-gray-700 rounded-lg shadow-2xl mx-4 max-h-[80vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+                <span class="text-xs text-yellow-400 uppercase tracking-wider font-medium">curl</span>
+                <div class="flex items-center gap-2">
+                    <!-- Single copy (play mode only) -->
+                    <button onclick="copyCurl('play')" id="curlCopyBtnPlay"
+                            class="hidden text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+                    <button onclick="closeCurlModal()"
+                            class="text-gray-500 hover:text-gray-300 text-lg leading-none transition-colors">&times;</button>
+                </div>
+            </div>
+            <!-- Play mode: single column -->
+            <div id="curlPlayBody" class="hidden overflow-auto p-4">
+                <pre id="curlPlayContent" class="text-xs text-yellow-400/80 whitespace-pre-wrap break-all"></pre>
+            </div>
+            <!-- Compare mode: two columns -->
+            <div id="curlCompareBody" class="hidden overflow-auto p-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span id="curlLeftLabel" class="text-xs text-gray-500 uppercase tracking-wider">Left</span>
+                            <button onclick="copyCurl('left')" id="curlCopyBtnLeft"
+                                    class="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded transition-colors">Copy</button>
+                        </div>
+                        <pre id="curlLeftContent" class="text-xs text-yellow-400/80 whitespace-pre-wrap break-all bg-gray-950/50 rounded-md p-3"></pre>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span id="curlRightLabel" class="text-xs text-gray-500 uppercase tracking-wider">Right</span>
+                            <button onclick="copyCurl('right')" id="curlCopyBtnRight"
+                                    class="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded transition-colors">Copy</button>
+                        </div>
+                        <pre id="curlRightContent" class="text-xs text-yellow-400/80 whitespace-pre-wrap break-all bg-gray-950/50 rounded-md p-3"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Log drawer -->
     <div id="logDrawer" class="fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 translate-y-full">

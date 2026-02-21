@@ -75,6 +75,20 @@ header select {
     background-image: none;
 }
 
+/* Result tabs */
+.result-tab {
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+.result-tab-active {
+    color: #e5e7eb;
+    border-bottom-color: #3b82f6;
+}
+.result-tab:not(.result-tab-active):hover {
+    color: #9ca3af;
+}
+
 /* Compare mode columns */
 .compare-column {
     border: 1px solid #1f2937;
