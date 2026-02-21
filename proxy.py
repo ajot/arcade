@@ -42,6 +42,12 @@ def build_request(definition, params, api_key):
         else:
             body[name] = value
 
+    # System prompt injection
+    system_prompt = params.get("_system_prompt", "")
+    body.pop("_system_prompt", None)
+    if "messages" in body and system_prompt:
+        body["messages"].insert(0, {"role": "system", "content": system_prompt})
+
     url = req["url"]
     return url, headers, body
 

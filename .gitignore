@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .env
 agents/
+list_openrouter_models.py
+list_together_models.py
+together_models.txt
+openrouter_models.txt
+update_openrouter_defs.py

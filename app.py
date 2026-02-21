@@ -85,7 +85,12 @@ load_definitions()
 def index():
     """Render the main playground page."""
     definitions_list = [
-        {"id": d["id"], "name": d["name"], "provider": d["provider"]}
+        {
+            "id": d["id"],
+            "name": d["name"],
+            "provider": d["provider"],
+            "output_type": d.get("response", {}).get("outputs", [{}])[0].get("type", "text"),
+        }
         for d in DEFINITIONS.values()
     ]
     definitions_list.sort(key=lambda d: d["name"])

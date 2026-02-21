@@ -74,3 +74,18 @@ select:focus, input:focus, textarea:focus {
 header select {
     background-image: none;
 }
+
+/* Compare mode columns */
+.compare-column {
+    border: 1px solid #1f2937;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    min-height: 120px;
+}
+
+/* Responsive: stack compare columns on small screens */
+@media (max-width: 768px) {
+    .compare-grid {
+        grid-template-columns: 1fr !important;
+    }
+}

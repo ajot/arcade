@@ -10,27 +10,39 @@
 <body class="bg-gray-950 text-gray-100 min-h-screen">
 
     <!-- Top bar -->
-    <header class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
+    <header id="topBar" class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
+        <!-- Row 1: Brand + mode + play pickers + API key -->
         <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 h-14">
-            <span class="text-sm font-semibold text-white tracking-tight mr-4">arcade</span>
+            <span class="text-sm font-semibold text-white tracking-tight mr-2">arcade</span>
 
-            <select id="providerPicker" onchange="onProviderChange()"
-                    class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
-                <option value="">All Providers</option>
-            </select>
+            <!-- Mode toggle -->
+            <div class="flex items-center border border-gray-800 rounded-md overflow-hidden mr-2 shrink-0">
+                <button id="modePlay" onclick="setMode('play')"
+                        class="px-3 py-1 text-xs text-white bg-gray-800/50 transition-colors whitespace-nowrap">Play</button>
+                <button id="modeCompare" onclick="setMode('compare')"
+                        class="px-3 py-1 text-xs text-gray-600 transition-colors whitespace-nowrap">Compare</button>
+            </div>
 
-            <select id="definitionPicker" onchange="onDefinitionChange()"
-                    class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
-                <option value="">Select endpoint...</option>
-                {% for d in definitions %}
-                <option value="{{ d.id }}">{{ d.name }}</option>
-                {% endfor %}
-            </select>
-
-            <div id="modelPickerGroup" class="hidden">
-                <select id="modelPicker"
+            <!-- Play mode pickers -->
+            <div id="playPickers" class="flex items-center gap-4">
+                <select id="providerPicker" onchange="onProviderChange()"
                         class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                    <option value="">All Providers</option>
                 </select>
+
+                <select id="definitionPicker" onchange="onDefinitionChange()"
+                        class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                    <option value="">Select endpoint...</option>
+                    {% for d in definitions %}
+                    <option value="{{ d.id }}">{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <div id="modelPickerGroup" class="hidden">
+                    <select id="modelPicker"
+                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                    </select>
+                </div>
             </div>
 
             <div class="ml-auto flex items-center gap-2">
@@ -46,15 +58,52 @@
                 <p id="apiKeyHint" class="text-xs text-gray-600 hidden"></p>
             </div>
         </div>
+
+        <!-- Row 2: Compare pickers (shown only in compare mode) -->
+        <div id="comparePickers" class="hidden border-t border-gray-800/50">
+            <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
+                <!-- Left side -->
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="text-[10px] text-gray-500 uppercase font-medium shrink-0">Left</span>
+                    <select id="compareLeftProvider" onchange="onCompareProviderChange('Left')"
+                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                        <option value="">Provider</option>
+                    </select>
+                    <select id="compareLeftEndpoint" onchange="onCompareEndpointChange('Left')"
+                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                        <option value="">Endpoint</option>
+                    </select>
+                    <select id="compareLeftModel"
+                            class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                    </select>
+                </div>
+                <span class="text-gray-700 text-xs shrink-0">vs</span>
+                <!-- Right side -->
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="text-[10px] text-gray-500 uppercase font-medium shrink-0">Right</span>
+                    <select id="compareRightProvider" onchange="onCompareProviderChange('Right')"
+                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                        <option value="">Provider</option>
+                    </select>
+                    <select id="compareRightEndpoint" onchange="onCompareEndpointChange('Right')"
+                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                        <option value="">Endpoint</option>
+                    </select>
+                    <select id="compareRightModel"
+                            class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                    </select>
+                </div>
+            </div>
+        </div>
     </header>
 
-    <!-- Progress bar -->
-    <div id="progressBar" class="fixed top-14 left-0 right-0 z-30 hidden">
+    <!-- Progress bar (top offset adjusts dynamically via JS) -->
+    <div id="progressBar" class="fixed left-0 right-0 z-30 hidden overflow-hidden" style="top: 56px;">
         <div class="h-0.5 bg-blue-500 animate-progress"></div>
     </div>
 
     <!-- Main centered column -->
-    <main class="max-w-[720px] mx-auto px-6 pt-24 pb-24">
+    <main id="mainColumn" class="mx-auto px-6 pt-24 pb-24 transition-all duration-300" style="max-width: 720px;">
 
         <!-- Endpoint info -->
         <div id="playground" class="hidden">
@@ -69,8 +118,48 @@
                 <div id="exampleButtons" class="flex flex-wrap gap-2"></div>
             </div>
 
+            <!-- System prompt (collapsible) -->
+            <div id="systemPromptGroup" class="mb-5 hidden">
+                <button type="button" onclick="toggleSystemPrompt()" class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2">
+                    <span id="systemPromptArrow" class="text-[10px]">&#9654;</span>
+                    System prompt
+                </button>
+                <textarea id="systemPromptInput"
+                          class="w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-blue-500 resize-y hidden"
+                          rows="3" placeholder="You are a helpful assistant..."></textarea>
+            </div>
+
             <!-- Form fields -->
             <div id="formFields" class="space-y-5"></div>
+
+            <!-- Compare: side-only params (rendered above Generate) -->
+            <div id="compareSideParams" class="hidden mt-5 grid grid-cols-2 gap-6">
+                <div>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Left only</p>
+                    <div id="compareLeftParams" class="space-y-4"></div>
+                </div>
+                <div>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Right only</p>
+                    <div id="compareRightParams" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- Compare warning -->
+            <p id="compareWarning" class="hidden mt-4 text-xs text-amber-400 border border-amber-900/50 rounded-md px-3 py-2"></p>
+
+            <!-- Compare mode API keys -->
+            <div id="compareApiKeys" class="hidden mt-5 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Left API Key</label>
+                    <input type="password" id="compareLeftApiKey" placeholder="API key"
+                           class="w-full bg-gray-900 border border-gray-800 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Right API Key</label>
+                    <input type="password" id="compareRightApiKey" placeholder="API key"
+                           class="w-full bg-gray-900 border border-gray-800 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
 
             <!-- Generate button -->
             <div class="mt-6">
@@ -81,31 +170,98 @@
             </div>
         </div>
 
-        <!-- Results -->
+        <!-- Play mode Results -->
         <div id="results" class="hidden mt-10">
             <div class="flex items-center justify-between mb-4">
                 <div class="h-px flex-1 bg-gray-800"></div>
                 <span class="px-3 text-xs text-gray-600 uppercase tracking-wider">Result</span>
                 <div class="h-px flex-1 bg-gray-800"></div>
             </div>
-            <!-- Rendered output -->
             <div id="renderedOutput" class="space-y-4"></div>
-            <!-- JSON toggle -->
+            <div id="metricsRow" class="mt-3"></div>
             <div class="mt-4">
-                <button id="jsonToggleBtn" onclick="toggleJson()"
+                <button id="jsonToggleBtn" onclick="toggleJson('play')"
                         class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">
                     { }
                 </button>
             </div>
-            <!-- Raw JSON (hidden by default) -->
             <div id="jsonView" class="hidden mt-3 space-y-3">
                 <div>
                     <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
-                    <pre id="jsonRequest" class="bg-gray-900 rounded-md p-3 text-xs text-green-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+                    <pre class="json-request bg-gray-900 rounded-md p-3 text-xs text-green-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
                 </div>
                 <div>
                     <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
-                    <pre id="jsonResponse" class="bg-gray-900 rounded-md p-3 text-xs text-blue-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+                    <pre class="json-response bg-gray-900 rounded-md p-3 text-xs text-blue-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compare mode Results -->
+        <div id="compareResults" class="hidden mt-10">
+            <div class="flex items-center justify-between mb-4">
+                <div class="h-px flex-1 bg-gray-800"></div>
+                <span class="px-3 text-xs text-gray-600 uppercase tracking-wider">Results</span>
+                <div class="h-px flex-1 bg-gray-800"></div>
+            </div>
+            <div class="compare-grid grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Left column -->
+                <div class="compare-column">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs text-gray-500 uppercase tracking-wider">Left</span>
+                    </div>
+                    <div id="compareLeftOutput" class="space-y-4 min-h-[60px]"></div>
+                    <div id="compareLeftMetrics" class="mt-3"></div>
+                    <!-- Left error -->
+                    <div id="compareLeftError" class="hidden mt-3">
+                        <div class="border border-red-900/50 rounded-md px-3 py-2">
+                            <p class="slot-error-msg text-red-400 text-xs"></p>
+                        </div>
+                    </div>
+                    <!-- Left JSON -->
+                    <div class="mt-3">
+                        <button id="compareLeftJsonBtn" onclick="toggleJson('left')"
+                                class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">{ }</button>
+                    </div>
+                    <div id="compareLeftJsonView" class="hidden mt-2 space-y-2">
+                        <div>
+                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
+                            <pre class="json-request bg-gray-900 rounded-md p-2 text-xs text-green-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                        </div>
+                        <div>
+                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
+                            <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                        </div>
+                    </div>
+                </div>
+                <!-- Right column -->
+                <div class="compare-column">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs text-gray-500 uppercase tracking-wider">Right</span>
+                    </div>
+                    <div id="compareRightOutput" class="space-y-4 min-h-[60px]"></div>
+                    <div id="compareRightMetrics" class="mt-3"></div>
+                    <!-- Right error -->
+                    <div id="compareRightError" class="hidden mt-3">
+                        <div class="border border-red-900/50 rounded-md px-3 py-2">
+                            <p class="slot-error-msg text-red-400 text-xs"></p>
+                        </div>
+                    </div>
+                    <!-- Right JSON -->
+                    <div class="mt-3">
+                        <button id="compareRightJsonBtn" onclick="toggleJson('right')"
+                                class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">{ }</button>
+                    </div>
+                    <div id="compareRightJsonView" class="hidden mt-2 space-y-2">
+                        <div>
+                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
+                            <pre class="json-request bg-gray-900 rounded-md p-2 text-xs text-green-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                        </div>
+                        <div>
+                            <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
+                            <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-48 overflow-y-auto"></pre>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

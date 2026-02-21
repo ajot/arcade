@@ -21,14 +21,90 @@ const PROVIDER_NAMES = {
 };
 
 // ---------------------------------------------------------------------------
-// State
+// State — slot-based model
 // ---------------------------------------------------------------------------
 
-let currentDefinition = null;
-let polling = false;
-let lastSentRequest = null;
-let lastResponse = null;
+let mode = 'play'; // 'play' | 'compare'
 let logEntryCount = 0;
+
+function createSlot() {
+    return {
+        definition: null,
+        polling: false,
+        lastSentRequest: null,
+        lastResponse: null,
+        abortController: null,
+    };
+}
+
+let slots = {
+    play: createSlot(),
+    left: createSlot(),
+    right: createSlot(),
+};
+
+// Backward-compat getter for play slot
+function getCurrentDefinition() {
+    return mode === 'play' ? slots.play.definition : null;
+}
+
+// ---------------------------------------------------------------------------
+// DOM helpers — map slot to containers
+// ---------------------------------------------------------------------------
+
+function getOutputContainer(slotId) {
+    if (slotId === 'play') return document.getElementById('renderedOutput');
+    if (slotId === 'left') return document.getElementById('compareLeftOutput');
+    if (slotId === 'right') return document.getElementById('compareRightOutput');
+    return null;
+}
+
+function getMetricsContainer(slotId) {
+    if (slotId === 'play') return document.getElementById('metricsRow');
+    if (slotId === 'left') return document.getElementById('compareLeftMetrics');
+    if (slotId === 'right') return document.getElementById('compareRightMetrics');
+    return null;
+}
+
+function getJsonView(slotId) {
+    if (slotId === 'play') return document.getElementById('jsonView');
+    if (slotId === 'left') return document.getElementById('compareLeftJsonView');
+    if (slotId === 'right') return document.getElementById('compareRightJsonView');
+    return null;
+}
+
+function getJsonToggleBtn(slotId) {
+    if (slotId === 'play') return document.getElementById('jsonToggleBtn');
+    if (slotId === 'left') return document.getElementById('compareLeftJsonBtn');
+    if (slotId === 'right') return document.getElementById('compareRightJsonBtn');
+    return null;
+}
+
+function getErrorContainer(slotId) {
+    if (slotId === 'play') return document.getElementById('errorDisplay');
+    if (slotId === 'left') return document.getElementById('compareLeftError');
+    if (slotId === 'right') return document.getElementById('compareRightError');
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+// Abort helpers
+// ---------------------------------------------------------------------------
+
+function abortSlot(slotId) {
+    const slot = slots[slotId];
+    if (slot.abortController) {
+        slot.abortController.abort();
+        slot.abortController = null;
+    }
+    slot.polling = false;
+}
+
+function abortAllSlots() {
+    abortSlot('play');
+    abortSlot('left');
+    abortSlot('right');
+}
 
 // ---------------------------------------------------------------------------
 // API key toggle
@@ -53,7 +129,6 @@ function toggleLogDrawer() {
 
     if (drawer.classList.contains('log-drawer-open')) {
         pill.classList.add('hidden');
-        // Reset count
         logEntryCount = 0;
         updateLogCount();
     } else {
@@ -84,7 +159,104 @@ function hideProgress() {
 }
 
 // ---------------------------------------------------------------------------
-// Definition switching
+// System prompt
+// ---------------------------------------------------------------------------
+
+function toggleSystemPrompt() {
+    const input = document.getElementById('systemPromptInput');
+    const arrow = document.getElementById('systemPromptArrow');
+    const isHidden = input.classList.contains('hidden');
+    input.classList.toggle('hidden');
+    arrow.innerHTML = isHidden ? '&#9660;' : '&#9654;';
+    if (isHidden) input.focus();
+}
+
+function showSystemPromptGroup() {
+    document.getElementById('systemPromptGroup').classList.remove('hidden');
+}
+
+function hideSystemPromptGroup() {
+    document.getElementById('systemPromptGroup').classList.add('hidden');
+    document.getElementById('systemPromptInput').value = '';
+    document.getElementById('systemPromptInput').classList.add('hidden');
+    document.getElementById('systemPromptArrow').innerHTML = '&#9654;';
+}
+
+function definitionUsesChat(definition) {
+    if (!definition) return false;
+    return (definition.request?.params || []).some(p => p.body_path === '_chat_message');
+}
+
+// ---------------------------------------------------------------------------
+// Mode switching
+// ---------------------------------------------------------------------------
+
+function setMode(newMode) {
+    if (mode === newMode) return;
+    abortAllSlots();
+    mode = newMode;
+
+    const mainCol = document.getElementById('mainColumn');
+    const playPickers = document.getElementById('playPickers');
+    const comparePickers = document.getElementById('comparePickers');
+    const playResults = document.getElementById('results');
+    const compareResults = document.getElementById('compareResults');
+    const modePlay = document.getElementById('modePlay');
+    const modeCompare = document.getElementById('modeCompare');
+    const playground = document.getElementById('playground');
+
+    const compareApiKeys = document.getElementById('compareApiKeys');
+    const progressBar = document.getElementById('progressBar');
+
+    if (mode === 'play') {
+        mainCol.style.maxWidth = '720px';
+        mainCol.style.paddingTop = '6rem';
+        progressBar.style.top = '56px';
+        playPickers.classList.remove('hidden');
+        comparePickers.classList.add('hidden');
+        compareResults.classList.add('hidden');
+        compareApiKeys.classList.add('hidden');
+        document.getElementById('compareSideParams').classList.add('hidden');
+        modePlay.classList.add('text-white', 'bg-gray-800/50');
+        modePlay.classList.remove('text-gray-600');
+        modeCompare.classList.remove('text-white', 'bg-gray-800/50');
+        modeCompare.classList.add('text-gray-600');
+        // Restore play mode state
+        if (slots.play.definition) {
+            playground.classList.remove('hidden');
+        } else {
+            playground.classList.add('hidden');
+        }
+        // Restore system prompt for play definition
+        hideSystemPromptGroup();
+        if (definitionUsesChat(slots.play.definition)) {
+            showSystemPromptGroup();
+        }
+    } else {
+        mainCol.style.maxWidth = '1100px';
+        mainCol.style.paddingTop = '7.5rem';
+        progressBar.style.top = '96px';
+        playPickers.classList.add('hidden');
+        comparePickers.classList.remove('hidden');
+        playResults.classList.add('hidden');
+        compareApiKeys.classList.remove('hidden');
+        playground.classList.remove('hidden');
+        modeCompare.classList.add('text-white', 'bg-gray-800/50');
+        modeCompare.classList.remove('text-gray-600');
+        modePlay.classList.remove('text-white', 'bg-gray-800/50');
+        modePlay.classList.add('text-gray-600');
+        hideModelPicker();
+        hideBaseUrl();
+        updateCompareSystemPrompt();
+        updateCompareForm();
+    }
+
+    hideError();
+    setGenerating(false);
+}
+
+// ---------------------------------------------------------------------------
+// Definition switching (Play mode)
 // ---------------------------------------------------------------------------
 
 async function onDefinitionChange() {
@@ -97,13 +269,14 @@ async function onDefinitionChange() {
     // Reset
     results.classList.add('hidden');
     errorDisplay.classList.add('hidden');
-    stopPolling();
+    abortSlot('play');
     hideModelPicker();
     hideBaseUrl();
+    hideSystemPromptGroup();
 
     if (!id) {
         playground.classList.add('hidden');
-        currentDefinition = null;
+        slots.play.definition = null;
         return;
     }
 
@@ -111,31 +284,33 @@ async function onDefinitionChange() {
 
     try {
         const resp = await fetch(`/api/definitions/${id}`);
-        currentDefinition = await resp.json();
+        slots.play.definition = await resp.json();
+        const def = slots.play.definition;
 
-        // Populate model picker if definition has a model param
-        populateModelPicker(currentDefinition);
-        showBaseUrl(currentDefinition.request.url);
+        populateModelPicker(def);
+        showBaseUrl(def.request.url);
 
-        renderForm(currentDefinition);
+        renderForm(def);
         playground.classList.remove('hidden');
 
-        // Auto-fill API key from .env if available
-        const provider = currentDefinition.provider;
+        if (definitionUsesChat(def)) {
+            showSystemPromptGroup();
+        }
+
+        // Auto-fill API key
+        const provider = def.provider;
         const keyInput = document.getElementById('apiKey');
         const hint = document.getElementById('apiKeyHint');
         if (typeof API_KEYS !== 'undefined' && API_KEYS[provider]) {
             keyInput.value = API_KEYS[provider];
             hint.textContent = `Key loaded from environment for ${provider}`;
             hint.classList.remove('hidden');
-            // Keep API key input hidden when auto-filled
         } else {
             hint.classList.add('hidden');
-            // Show API key input if no key loaded
             document.getElementById('apiKeyWrapper').classList.remove('hidden');
         }
 
-        log(`Loaded: ${currentDefinition.name}`, 'info');
+        log(`Loaded: ${def.name}`, 'info');
     } catch (e) {
         log(`Failed to load definition: ${e.message}`, 'error');
     }
@@ -270,30 +445,41 @@ function createField(param) {
 function collectParams() {
     const params = {};
 
-    // Include model from config bar picker if visible
-    const modelGroup = document.getElementById('modelPickerGroup');
-    if (!modelGroup.classList.contains('hidden')) {
-        params['model'] = document.getElementById('modelPicker').value;
+    // Include model from config bar picker if visible (play mode)
+    if (mode === 'play') {
+        const modelGroup = document.getElementById('modelPickerGroup');
+        if (!modelGroup.classList.contains('hidden')) {
+            params['model'] = document.getElementById('modelPicker').value;
+        }
     }
 
     const fields = document.querySelectorAll('#formFields [data-param-name]');
     for (const field of fields) {
         const name = field.dataset.paramName;
-        if (field.type === 'range') {
-            params[name] = field.value;
-        } else {
-            params[name] = field.value;
-        }
+        params[name] = field.value;
     }
+
+    // Include system prompt if present
+    const sysPrompt = document.getElementById('systemPromptInput');
+    if (sysPrompt && sysPrompt.value.trim()) {
+        params['_system_prompt'] = sysPrompt.value.trim();
+    }
+
     return params;
 }
 
 // ---------------------------------------------------------------------------
-// Generate (submit)
+// Generate (submit) — dispatches to play or compare mode
 // ---------------------------------------------------------------------------
 
 async function onGenerate() {
-    if (!currentDefinition) return;
+    if (mode === 'compare') {
+        onCompareGenerate();
+        return;
+    }
+
+    const def = slots.play.definition;
+    if (!def) return;
 
     const apiKey = document.getElementById('apiKey').value.trim();
     if (!apiKey) {
@@ -304,7 +490,7 @@ async function onGenerate() {
     const params = collectParams();
 
     // Validate required params
-    for (const param of currentDefinition.request.params) {
+    for (const param of def.request.params) {
         if (param.required && !params[param.name]) {
             showError(`"${param.name}" is required.`);
             return;
@@ -315,29 +501,33 @@ async function onGenerate() {
     hideResults();
     setGenerating(true);
 
-    const pattern = currentDefinition.interaction.pattern;
+    const pattern = def.interaction.pattern;
 
     if (pattern === 'streaming') {
-        log(`POST /api/stream (${currentDefinition.name})`, 'request');
+        log(`POST /api/stream (${def.name})`, 'request');
         log(`Params: ${JSON.stringify(params)}`, 'info');
-        startStreaming(apiKey, params);
+        startStreaming('play', apiKey, params);
     } else {
-        log(`POST /api/generate (${currentDefinition.name})`, 'request');
+        log(`POST /api/generate (${def.name})`, 'request');
         log(`Params: ${JSON.stringify(params)}`, 'info');
+        const syncStart = performance.now();
 
         try {
+            slots.play.abortController = new AbortController();
             const resp = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    definition_id: currentDefinition.id,
+                    definition_id: def.id,
                     api_key: apiKey,
                     params: params,
                 }),
+                signal: slots.play.abortController.signal,
             });
 
             const data = await resp.json();
-            lastSentRequest = data.sent_request;
+            const submitTime = performance.now() - syncStart;
+            slots.play.lastSentRequest = data.sent_request;
 
             log(`Response: ${resp.status}`, resp.ok ? 'response' : 'error');
 
@@ -347,21 +537,22 @@ async function onGenerate() {
                 return;
             }
 
-            // Polling flow
             if (pattern === 'polling' && data.request_id) {
-                log(`Job submitted. request_id: ${data.request_id}`, 'info');
-                startPolling(data.request_id, apiKey);
+                log(`Job submitted in ${submitTime.toFixed(0)}ms. request_id: ${data.request_id}`, 'info');
+                startPolling('play', data.request_id, apiKey);
             } else {
-                // Sync response
-                lastResponse = data.response;
+                const syncMetrics = { totalTime: performance.now() - syncStart, submitTime };
+                slots.play.lastResponse = data.response;
                 if (data.outputs && data.outputs.length > 0) {
-                    renderOutputs(data.outputs);
+                    renderOutputs(data.outputs, 'play');
                 } else {
-                    renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}]);
+                    renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}], 'play');
                 }
+                renderMetrics(syncMetrics, getMetricsContainer('play'));
                 setGenerating(false);
             }
         } catch (e) {
+            if (e.name === 'AbortError') return;
             log(`Error: ${e.message}`, 'error');
             showError(e.message);
             setGenerating(false);
@@ -370,36 +561,42 @@ async function onGenerate() {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming
+// Streaming — slot-aware
 // ---------------------------------------------------------------------------
 
-async function startStreaming(apiKey, params) {
-    // Prepare the output area with an empty text block
-    const container = document.getElementById('renderedOutput');
+async function startStreaming(slotId, apiKey, params) {
+    const slot = slots[slotId];
+    const def = slot.definition;
+    const container = getOutputContainer(slotId);
     container.innerHTML = '';
     const textBlock = document.createElement('pre');
     textBlock.className = 'text-sm text-gray-200 whitespace-pre-wrap leading-relaxed streaming-cursor';
     textBlock.textContent = '';
     container.appendChild(textBlock);
-    showResults();
+
+    if (slotId === 'play') showResults();
 
     let fullText = '';
+    const metrics = { startTime: performance.now(), ttft: null, tokenCount: 0, totalTime: null, tokensPerSec: null };
+
+    slot.abortController = new AbortController();
 
     try {
         const resp = await fetch('/api/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                definition_id: currentDefinition.id,
+                definition_id: def.id,
                 api_key: apiKey,
                 params: params,
             }),
+            signal: slot.abortController.signal,
         });
 
         if (!resp.ok) {
             const errData = await resp.json();
-            showError(errData.error || 'Stream request failed');
-            setGenerating(false);
+            showSlotError(slotId, errData.error || 'Stream request failed');
+            if (slotId === 'play') setGenerating(false);
             return;
         }
 
@@ -413,17 +610,13 @@ async function startStreaming(apiKey, params) {
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop(); // Keep incomplete line in buffer
+            buffer = lines.pop();
 
             for (const line of lines) {
-                if (line.startsWith('event: request_info')) {
-                    continue;
-                }
-                if (line.startsWith('event: error')) {
-                    continue;
-                }
+                if (line.startsWith('event: request_info')) continue;
+                if (line.startsWith('event: error')) continue;
                 if (line.startsWith('event: done')) {
-                    log('Stream complete.', 'response');
+                    log(`[${slotId}] Stream complete.`, 'response');
                     continue;
                 }
                 if (line.startsWith('data: ')) {
@@ -431,17 +624,19 @@ async function startStreaming(apiKey, params) {
                     try {
                         const data = JSON.parse(dataStr);
                         if (data.token) {
+                            if (metrics.ttft === null) {
+                                metrics.ttft = performance.now() - metrics.startTime;
+                            }
+                            metrics.tokenCount++;
                             fullText += data.token;
                             textBlock.textContent = fullText;
-                            // Auto-scroll
                             textBlock.scrollTop = textBlock.scrollHeight;
                         }
                         if (data.error) {
-                            showError(data.error);
+                            showSlotError(slotId, data.error);
                         }
-                        // Capture request info for JSON toggle
                         if (data.method) {
-                            lastSentRequest = data;
+                            slot.lastSentRequest = data;
                         }
                     } catch (e) {
                         // Skip unparseable chunks
@@ -450,92 +645,116 @@ async function startStreaming(apiKey, params) {
             }
         }
 
-        lastResponse = { text: fullText };
-        log(`Streamed ${fullText.length} characters.`, 'response');
+        metrics.totalTime = performance.now() - metrics.startTime;
+        if (metrics.tokenCount > 0 && metrics.totalTime > 0) {
+            metrics.tokensPerSec = metrics.tokenCount / (metrics.totalTime / 1000);
+        }
+
+        slot.lastResponse = { text: fullText };
+        log(`[${slotId}] Streamed ${fullText.length} chars, ${metrics.tokenCount} tokens in ${(metrics.totalTime/1000).toFixed(2)}s`, 'response');
+        renderMetrics(metrics, getMetricsContainer(slotId));
 
     } catch (e) {
-        log(`Stream error: ${e.message}`, 'error');
-        showError(e.message);
+        if (e.name === 'AbortError') return;
+        log(`[${slotId}] Stream error: ${e.message}`, 'error');
+        showSlotError(slotId, e.message);
     }
 
     textBlock.classList.remove('streaming-cursor');
-    setGenerating(false);
+    if (slotId === 'play') setGenerating(false);
 }
 
 // ---------------------------------------------------------------------------
-// Polling
+// Polling — slot-aware
 // ---------------------------------------------------------------------------
 
-function startPolling(requestId, apiKey) {
-    polling = true;
-    const interval = currentDefinition.interaction.poll_interval_ms || 2000;
-    log(`Polling every ${interval}ms...`, 'info');
-    pollLoop(requestId, apiKey, interval);
+function startPolling(slotId, requestId, apiKey) {
+    const slot = slots[slotId];
+    slot.polling = true;
+    const def = slot.definition;
+    const interval = def.interaction.poll_interval_ms || 2000;
+    const metrics = { startTime: performance.now(), submitTime: null, pollCount: 0, totalTime: null };
+    log(`[${slotId}] Polling every ${interval}ms...`, 'info');
+    pollLoop(slotId, requestId, apiKey, interval, metrics);
 }
 
-function stopPolling() {
-    polling = false;
-}
+async function pollLoop(slotId, requestId, apiKey, interval, metrics) {
+    const slot = slots[slotId];
+    const def = slot.definition;
+    let consecutiveErrors = 0;
+    const MAX_POLL_ERRORS = 10;
 
-async function pollLoop(requestId, apiKey, interval) {
-    while (polling) {
+    while (slot.polling) {
         try {
-            const url = `/api/status?definition_id=${currentDefinition.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
+            metrics.pollCount++;
+            const url = `/api/status?definition_id=${def.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
             const resp = await fetch(url);
             const data = await resp.json();
+            consecutiveErrors = 0;
 
-            log(`Status: ${data.poll_status}`, 'info');
+            log(`[${slotId}] Status: ${data.poll_status} (poll #${metrics.pollCount})`, 'info');
 
             if (data.poll_status === 'done') {
-                log('Job complete. Fetching result...', 'response');
-                await fetchResult(requestId, apiKey);
-                stopPolling();
-                setGenerating(false);
+                metrics.totalTime = performance.now() - metrics.startTime;
+                log(`[${slotId}] Job complete. Fetching result...`, 'response');
+                await fetchResult(slotId, requestId, apiKey);
+                renderMetrics(metrics, getMetricsContainer(slotId));
+                slot.polling = false;
+                if (slotId === 'play') setGenerating(false);
                 return;
             }
 
             if (data.poll_status === 'failed' || data.poll_status === 'error') {
-                log('Job failed.', 'error');
-                showError('Generation failed. Check the log for details.');
-                stopPolling();
-                setGenerating(false);
+                log(`[${slotId}] Job failed.`, 'error');
+                showSlotError(slotId, 'Generation failed. Check the log for details.');
+                slot.polling = false;
+                if (slotId === 'play') setGenerating(false);
                 return;
             }
         } catch (e) {
-            log(`Poll error: ${e.message}`, 'error');
+            consecutiveErrors++;
+            log(`[${slotId}] Poll error: ${e.message}`, 'error');
+            if (consecutiveErrors >= MAX_POLL_ERRORS) {
+                showSlotError(slotId, 'Polling failed after too many errors.');
+                slot.polling = false;
+                if (slotId === 'play') setGenerating(false);
+                return;
+            }
         }
 
-        // Wait before next poll
         await new Promise(r => setTimeout(r, interval));
     }
 }
 
-async function fetchResult(requestId, apiKey) {
+async function fetchResult(slotId, requestId, apiKey) {
+    const slot = slots[slotId];
+    const def = slot.definition;
+
     try {
-        const url = `/api/result?definition_id=${currentDefinition.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
+        const url = `/api/result?definition_id=${def.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
         const resp = await fetch(url);
         const data = await resp.json();
 
-        lastResponse = data.response;
+        slot.lastResponse = data.response;
 
         if (data.outputs && data.outputs.length > 0) {
-            renderOutputs(data.outputs);
+            renderOutputs(data.outputs, slotId);
         } else {
-            log('No outputs extracted from response.', 'error');
-            renderRawFallback(data.response);
+            log(`[${slotId}] No outputs extracted from response.`, 'error');
+            renderRawFallback(data.response, slotId);
         }
     } catch (e) {
-        log(`Result fetch error: ${e.message}`, 'error');
-        showError('Failed to fetch result.');
+        log(`[${slotId}] Result fetch error: ${e.message}`, 'error');
+        showSlotError(slotId, 'Failed to fetch result.');
     }
 }
 
 // ---------------------------------------------------------------------------
-// Output rendering
+// Output rendering — slot-aware
 // ---------------------------------------------------------------------------
 
-function renderOutputs(outputs) {
-    const container = document.getElementById('renderedOutput');
+function renderOutputs(outputs, slotId) {
+    const container = getOutputContainer(slotId);
     container.innerHTML = '';
 
     for (const output of outputs) {
@@ -563,8 +782,8 @@ function renderOutputs(outputs) {
         }
     }
 
-    showResults();
-    log('Result rendered.', 'response');
+    if (slotId === 'play') showResults();
+    log(`[${slotId}] Result rendered.`, 'response');
 }
 
 function createImageRenderer(url, downloadable) {
@@ -617,6 +836,11 @@ function createVideoRenderer(url, downloadable) {
 }
 
 function createAudioRenderer(url, downloadable) {
+    // Convert raw base64 to a playable data URL
+    if (url && !url.startsWith('data:') && !url.startsWith('http')) {
+        url = `data:audio/wav;base64,${url}`;
+    }
+
     const div = document.createElement('div');
     div.className = 'space-y-3';
 
@@ -649,34 +873,59 @@ function createTextRenderer(text) {
     return pre;
 }
 
-function renderRawFallback(data) {
-    const container = document.getElementById('renderedOutput');
+function renderRawFallback(data, slotId) {
+    const container = getOutputContainer(slotId);
     container.innerHTML = '';
     container.appendChild(createTextRenderer(JSON.stringify(data, null, 2)));
-    showResults();
+    if (slotId === 'play') showResults();
 }
 
 // ---------------------------------------------------------------------------
-// JSON toggle
+// JSON toggle — slot-aware
 // ---------------------------------------------------------------------------
 
-function toggleJson() {
-    const view = document.getElementById('jsonView');
-    const btn = document.getElementById('jsonToggleBtn');
+function toggleJson(slotId) {
+    slotId = slotId || 'play';
+    const view = getJsonView(slotId);
+    const btn = getJsonToggleBtn(slotId);
+    const slot = slots[slotId];
+    if (!view || !btn) return;
+
     const isHidden = view.classList.contains('hidden');
 
     if (isHidden) {
         view.classList.remove('hidden');
         btn.textContent = '[hide]';
 
-        document.getElementById('jsonRequest').textContent =
-            lastSentRequest ? JSON.stringify(lastSentRequest, null, 2) : 'No request captured';
-        document.getElementById('jsonResponse').textContent =
-            lastResponse ? JSON.stringify(lastResponse, null, 2) : 'No response captured';
+        const reqEl = view.querySelector('.json-request');
+        const resEl = view.querySelector('.json-response');
+        if (reqEl) reqEl.textContent = slot.lastSentRequest ? JSON.stringify(slot.lastSentRequest, null, 2) : 'No request captured';
+        if (resEl) resEl.textContent = slot.lastResponse ? JSON.stringify(slot.lastResponse, null, 2) : 'No response captured';
     } else {
         view.classList.add('hidden');
         btn.textContent = '{ }';
     }
+}
+
+// ---------------------------------------------------------------------------
+// Metrics rendering
+// ---------------------------------------------------------------------------
+
+function renderMetrics(metrics, container) {
+    if (!container) return;
+    container.innerHTML = '';
+    const parts = [];
+    if (metrics.ttft != null) parts.push(`TTFT: ${metrics.ttft.toFixed(0)}ms`);
+    if (metrics.tokensPerSec != null) parts.push(`${metrics.tokensPerSec.toFixed(1)} tok/s`);
+    if (metrics.totalTime != null) parts.push(`Total: ${(metrics.totalTime / 1000).toFixed(2)}s`);
+    if (metrics.tokenCount != null) parts.push(`${metrics.tokenCount} tokens`);
+    if (metrics.pollCount != null) parts.push(`${metrics.pollCount} polls`);
+    if (metrics.submitTime != null) parts.push(`Submit: ${metrics.submitTime.toFixed(0)}ms`);
+    if (parts.length === 0) return;
+    const span = document.createElement('span');
+    span.className = 'text-[11px] text-gray-500 font-mono';
+    span.textContent = parts.join('  \u00b7  ');
+    container.appendChild(span);
 }
 
 // ---------------------------------------------------------------------------
@@ -704,8 +953,12 @@ function showResults() {
 
 function hideResults() {
     document.getElementById('results').classList.add('hidden');
-    document.getElementById('jsonView').classList.add('hidden');
-    document.getElementById('jsonToggleBtn').textContent = '{ }';
+    const jsonView = document.getElementById('jsonView');
+    if (jsonView) jsonView.classList.add('hidden');
+    const jsonBtn = document.getElementById('jsonToggleBtn');
+    if (jsonBtn) jsonBtn.textContent = '{ }';
+    const metricsEl = document.getElementById('metricsRow');
+    if (metricsEl) metricsEl.innerHTML = '';
 }
 
 function showError(msg) {
@@ -714,8 +967,26 @@ function showError(msg) {
     log(`Error: ${msg}`, 'error');
 }
 
+function showSlotError(slotId, msg) {
+    if (slotId === 'play') {
+        showError(msg);
+        return;
+    }
+    const errEl = getErrorContainer(slotId);
+    if (errEl) {
+        errEl.querySelector('.slot-error-msg').textContent = msg;
+        errEl.classList.remove('hidden');
+    }
+    log(`[${slotId}] Error: ${msg}`, 'error');
+}
+
 function hideError() {
     document.getElementById('errorDisplay').classList.add('hidden');
+    // Also hide compare slot errors
+    const leftErr = document.getElementById('compareLeftError');
+    const rightErr = document.getElementById('compareRightError');
+    if (leftErr) leftErr.classList.add('hidden');
+    if (rightErr) rightErr.classList.add('hidden');
 }
 
 function showBaseUrl(url) {
@@ -743,7 +1014,6 @@ function log(message, type = 'info') {
     consoleEl.appendChild(entry);
     consoleEl.scrollTop = consoleEl.scrollHeight;
 
-    // Update count badge if drawer is closed
     const drawer = document.getElementById('logDrawer');
     if (!drawer.classList.contains('log-drawer-open')) {
         logEntryCount++;
@@ -753,6 +1023,8 @@ function log(message, type = 'info') {
 
 function clearLog() {
     document.getElementById('logConsole').innerHTML = '';
+    logEntryCount = 0;
+    updateLogCount();
 }
 
 // ---------------------------------------------------------------------------
@@ -787,7 +1059,7 @@ function hideModelPicker() {
 }
 
 // ---------------------------------------------------------------------------
-// Provider filtering
+// Provider filtering (Play mode)
 // ---------------------------------------------------------------------------
 
 function onProviderChange() {
@@ -819,11 +1091,10 @@ function onProviderChange() {
             picker.appendChild(opt);
         }
         picker.value = '';
-        // Hide playground, model picker, and base URL when resetting endpoint selection
         document.getElementById('playground').classList.add('hidden');
         hideModelPicker();
         hideBaseUrl();
-        currentDefinition = null;
+        slots.play.definition = null;
     }
 }
 
@@ -840,7 +1111,517 @@ function initProviderPicker() {
 }
 
 // ---------------------------------------------------------------------------
+// Compare mode — picker handlers
+// ---------------------------------------------------------------------------
+
+function initCompareProviderPickers() {
+    for (const side of ['Left', 'Right']) {
+        const picker = document.getElementById(`compare${side}Provider`);
+        if (!picker) continue;
+        picker.innerHTML = '<option value="">Provider</option>';
+        const providers = [...new Set(DEFINITIONS_LIST.map(d => d.provider))].sort();
+        for (const slug of providers) {
+            const opt = document.createElement('option');
+            opt.value = slug;
+            opt.textContent = PROVIDER_NAMES[slug] || slug;
+            picker.appendChild(opt);
+        }
+    }
+}
+
+function onCompareProviderChange(side) {
+    const providerSlug = document.getElementById(`compare${side}Provider`).value;
+    const endpointPicker = document.getElementById(`compare${side}Endpoint`);
+    const modelPicker = document.getElementById(`compare${side}Model`);
+
+    endpointPicker.innerHTML = '<option value="">Endpoint</option>';
+    modelPicker.innerHTML = '';
+    modelPicker.classList.add('hidden');
+
+    const otherSide = side === 'Left' ? 'right' : 'left';
+    const otherDef = slots[otherSide].definition;
+    const otherType = otherDef ? getOutputTypeFromList(otherDef.id) : null;
+
+    let filtered = providerSlug
+        ? DEFINITIONS_LIST.filter(d => d.provider === providerSlug)
+        : DEFINITIONS_LIST;
+
+    // Filter to compatible output types if other side has a selection
+    if (otherType) {
+        filtered = filtered.filter(d => d.output_type === otherType);
+    }
+
+    for (const d of filtered) {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        endpointPicker.appendChild(opt);
+    }
+
+    const slotId = side.toLowerCase();
+    slots[slotId].definition = null;
+
+    updateCompareApiKey(side, providerSlug);
+    checkCompareCompatibility();
+}
+
+function getOutputTypeFromList(defId) {
+    const entry = DEFINITIONS_LIST.find(d => d.id === defId);
+    return entry ? entry.output_type : null;
+}
+
+function filterOtherSideEndpoints(changedSide) {
+    const otherSide = changedSide === 'Left' ? 'Right' : 'Left';
+    const changedSlot = slots[changedSide.toLowerCase()];
+    const otherEndpointPicker = document.getElementById(`compare${otherSide}Endpoint`);
+    const otherProviderSlug = document.getElementById(`compare${otherSide}Provider`).value;
+
+    // Preserve current selection
+    const currentValue = otherEndpointPicker.value;
+
+    // Determine the output type to filter by
+    const filterType = changedSlot.definition
+        ? getOutputTypeFromList(changedSlot.definition.id)
+        : null;
+
+    // Get base list filtered by provider
+    let candidates = otherProviderSlug
+        ? DEFINITIONS_LIST.filter(d => d.provider === otherProviderSlug)
+        : DEFINITIONS_LIST;
+
+    // Filter to compatible output types
+    if (filterType) {
+        candidates = candidates.filter(d => d.output_type === filterType);
+    }
+
+    otherEndpointPicker.innerHTML = '<option value="">Endpoint</option>';
+    for (const d of candidates) {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.name;
+        otherEndpointPicker.appendChild(opt);
+    }
+
+    // Restore selection if it's still in the filtered list
+    if (candidates.some(d => d.id === currentValue)) {
+        otherEndpointPicker.value = currentValue;
+    }
+}
+
+async function onCompareEndpointChange(side) {
+    const endpointPicker = document.getElementById(`compare${side}Endpoint`);
+    const modelPicker = document.getElementById(`compare${side}Model`);
+    const defId = endpointPicker.value;
+    const slotId = side.toLowerCase();
+
+    modelPicker.innerHTML = '';
+    modelPicker.classList.add('hidden');
+
+    if (!defId) {
+        slots[slotId].definition = null;
+        filterOtherSideEndpoints(side);
+        checkCompareCompatibility();
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/definitions/${defId}`);
+        const def = await resp.json();
+        slots[slotId].definition = def;
+
+        // Populate model picker
+        const modelParam = def.request.params.find(p => p.name === 'model' && p.ui === 'dropdown');
+        if (modelParam && modelParam.options && modelParam.options.length > 0) {
+            for (const opt of modelParam.options) {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                if (opt === modelParam.default) option.selected = true;
+                modelPicker.appendChild(option);
+            }
+            modelPicker.classList.remove('hidden');
+        }
+
+        // Update API key
+        updateCompareApiKey(side, def.provider);
+        // Filter other side's endpoints to compatible types
+        filterOtherSideEndpoints(side);
+        log(`[${slotId}] Loaded: ${def.name}`, 'info');
+    } catch (e) {
+        log(`[${slotId}] Failed to load definition: ${e.message}`, 'error');
+    }
+
+    checkCompareCompatibility();
+    updateCompareSystemPrompt();
+    updateCompareForm();
+}
+
+function updateCompareApiKey(side, providerSlug) {
+    const keyInput = document.getElementById(`compare${side}ApiKey`);
+    if (!keyInput) return;
+    if (providerSlug && typeof API_KEYS !== 'undefined' && API_KEYS[providerSlug]) {
+        keyInput.value = API_KEYS[providerSlug];
+    } else {
+        keyInput.value = '';
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compare mode — output type and compatibility
+// ---------------------------------------------------------------------------
+
+function getOutputType(definition) {
+    if (!definition) return null;
+    const outputs = definition.response && definition.response.outputs;
+    if (!outputs || outputs.length === 0) return null;
+    return outputs[0].type;
+}
+
+function checkCompareCompatibility() {
+    const leftDef = slots.left.definition;
+    const rightDef = slots.right.definition;
+    const warning = document.getElementById('compareWarning');
+    const btn = document.getElementById('generateBtn');
+
+    if (!leftDef || !rightDef) {
+        if (warning) warning.classList.add('hidden');
+        return;
+    }
+
+    const leftType = getOutputType(leftDef);
+    const rightType = getOutputType(rightDef);
+
+    if (leftType && rightType && leftType !== rightType) {
+        if (warning) {
+            warning.textContent = `Output type mismatch: ${leftType} vs ${rightType}. Select matching endpoint types.`;
+            warning.classList.remove('hidden');
+        }
+        btn.disabled = true;
+        btn.className = 'bg-gray-700 text-gray-400 text-sm font-medium px-5 py-2 rounded-md cursor-not-allowed';
+    } else {
+        if (warning) warning.classList.add('hidden');
+        btn.disabled = false;
+        btn.className = 'bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors';
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compare mode — system prompt visibility
+// ---------------------------------------------------------------------------
+
+function updateCompareSystemPrompt() {
+    const leftDef = slots.left.definition;
+    const rightDef = slots.right.definition;
+    if (definitionUsesChat(leftDef) || definitionUsesChat(rightDef)) {
+        showSystemPromptGroup();
+    } else {
+        hideSystemPromptGroup();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compare mode — shared form rendering
+// ---------------------------------------------------------------------------
+
+function updateCompareForm() {
+    const leftDef = slots.left.definition;
+    const rightDef = slots.right.definition;
+
+    // Show endpoint info
+    if (leftDef && rightDef) {
+        document.getElementById('endpointName').textContent = 'Compare';
+        document.getElementById('endpointDescription').textContent = `${leftDef.name} vs ${rightDef.name}`;
+    } else if (leftDef || rightDef) {
+        const def = leftDef || rightDef;
+        document.getElementById('endpointName').textContent = def.name;
+        document.getElementById('endpointDescription').textContent = def.description || '';
+    } else {
+        document.getElementById('endpointName').textContent = 'Select endpoints to compare';
+        document.getElementById('endpointDescription').textContent = '';
+    }
+    hideBaseUrl();
+
+    // Compute shared params
+    const { shared } = computeSharedParams(leftDef, rightDef);
+
+    const container = document.getElementById('formFields');
+    container.innerHTML = '';
+
+    // Hide examples in compare mode
+    document.getElementById('examplesRow').classList.add('hidden');
+
+    for (const param of shared) {
+        if (param.name === 'model' && param.ui === 'dropdown') continue;
+        const field = createField(param);
+        container.appendChild(field);
+    }
+
+    // Render side-only params
+    const hasLeftOnly = renderSideOnlyParams('left', leftDef, shared);
+    const hasRightOnly = renderSideOnlyParams('right', rightDef, shared);
+
+    // Show/hide the side-only params container
+    const sideParamsContainer = document.getElementById('compareSideParams');
+    if (sideParamsContainer) {
+        if (hasLeftOnly || hasRightOnly) {
+            sideParamsContainer.classList.remove('hidden');
+        } else {
+            sideParamsContainer.classList.add('hidden');
+        }
+    }
+}
+
+function computeSharedParams(leftDef, rightDef) {
+    if (!leftDef && !rightDef) return { shared: [], leftOnly: [], rightOnly: [] };
+    if (!leftDef) return { shared: [], leftOnly: [], rightOnly: rightDef.request.params };
+    if (!rightDef) return { shared: [], leftOnly: leftDef.request.params, rightOnly: [] };
+
+    const leftParams = leftDef.request.params;
+    const rightParams = rightDef.request.params;
+    const rightNames = new Set(rightParams.map(p => p.name));
+    const leftNames = new Set(leftParams.map(p => p.name));
+
+    const shared = leftParams.filter(p => rightNames.has(p.name));
+    const leftOnly = leftParams.filter(p => !rightNames.has(p.name));
+    const rightOnly = rightParams.filter(p => !leftNames.has(p.name));
+
+    return { shared, leftOnly, rightOnly };
+}
+
+function renderSideOnlyParams(side, def, sharedParams) {
+    const capSide = side.charAt(0).toUpperCase() + side.slice(1);
+    const container = document.getElementById(`compare${capSide}Params`);
+    if (!container) return false;
+    container.innerHTML = '';
+    // Use invisible (not hidden) so the grid column keeps its space
+    const parentCol = container.parentElement;
+
+    if (!def) {
+        if (parentCol) { parentCol.classList.add('invisible'); parentCol.classList.remove('visible'); }
+        return false;
+    }
+
+    const sharedNames = new Set(sharedParams.map(p => p.name));
+    const sideOnly = def.request.params.filter(p => !sharedNames.has(p.name) && !(p.name === 'model' && p.ui === 'dropdown'));
+
+    if (sideOnly.length === 0) {
+        if (parentCol) { parentCol.classList.add('invisible'); parentCol.classList.remove('visible'); }
+        return false;
+    }
+
+    if (parentCol) { parentCol.classList.remove('invisible'); parentCol.classList.add('visible'); }
+    for (const param of sideOnly) {
+        const field = createField(param);
+        container.appendChild(field);
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Compare mode — generate
+// ---------------------------------------------------------------------------
+
+async function onCompareGenerate() {
+    const leftDef = slots.left.definition;
+    const rightDef = slots.right.definition;
+
+    if (!leftDef || !rightDef) {
+        showError('Please select endpoints for both Left and Right.');
+        return;
+    }
+
+    const leftApiKey = document.getElementById('compareLeftApiKey').value.trim();
+    const rightApiKey = document.getElementById('compareRightApiKey').value.trim();
+
+    if (!leftApiKey || !rightApiKey) {
+        showError('API keys required for both sides.');
+        return;
+    }
+
+    // Collect shared params from form
+    const sharedParams = collectParams();
+
+    // Collect left-side model
+    const leftModelPicker = document.getElementById('compareLeftModel');
+    const leftModel = leftModelPicker && !leftModelPicker.classList.contains('hidden') ? leftModelPicker.value : null;
+
+    // Collect right-side model
+    const rightModelPicker = document.getElementById('compareRightModel');
+    const rightModel = rightModelPicker && !rightModelPicker.classList.contains('hidden') ? rightModelPicker.value : null;
+
+    // Build per-side params
+    const leftParams = { ...sharedParams };
+    if (leftModel) leftParams['model'] = leftModel;
+    collectSideParams('Left', leftParams);
+
+    const rightParams = { ...sharedParams };
+    if (rightModel) rightParams['model'] = rightModel;
+    collectSideParams('Right', rightParams);
+
+    // Validate
+    for (const param of leftDef.request.params) {
+        if (param.required && !leftParams[param.name]) {
+            showError(`Left: "${param.name}" is required.`);
+            return;
+        }
+    }
+    for (const param of rightDef.request.params) {
+        if (param.required && !rightParams[param.name]) {
+            showError(`Right: "${param.name}" is required.`);
+            return;
+        }
+    }
+
+    hideError();
+    setGenerating(true);
+
+    // Show compare results, clear previous
+    const compareResults = document.getElementById('compareResults');
+    compareResults.classList.remove('hidden');
+    getOutputContainer('left').innerHTML = '';
+    getOutputContainer('right').innerHTML = '';
+    const leftMetrics = getMetricsContainer('left');
+    const rightMetrics = getMetricsContainer('right');
+    if (leftMetrics) leftMetrics.innerHTML = '';
+    if (rightMetrics) rightMetrics.innerHTML = '';
+    // Hide errors
+    const leftErr = document.getElementById('compareLeftError');
+    const rightErr = document.getElementById('compareRightError');
+    if (leftErr) leftErr.classList.add('hidden');
+    if (rightErr) rightErr.classList.add('hidden');
+
+    // Execute both sides in parallel
+    const results = await Promise.allSettled([
+        executeSlot('left', leftApiKey, leftParams),
+        executeSlot('right', rightApiKey, rightParams),
+    ]);
+
+    log('Compare generation complete.', 'info');
+    setGenerating(false);
+}
+
+function collectSideParams(side, params) {
+    const container = document.getElementById(`compare${side}Params`);
+    if (!container) return;
+    const fields = container.querySelectorAll('[data-param-name]');
+    for (const field of fields) {
+        params[field.dataset.paramName] = field.value;
+    }
+}
+
+async function executeSlot(slotId, apiKey, params) {
+    const slot = slots[slotId];
+    const def = slot.definition;
+    const pattern = def.interaction.pattern;
+
+    if (pattern === 'streaming') {
+        log(`[${slotId}] POST /api/stream (${def.name})`, 'request');
+        await startStreaming(slotId, apiKey, params);
+    } else {
+        log(`[${slotId}] POST /api/generate (${def.name})`, 'request');
+        const syncStart = performance.now();
+
+        try {
+            slot.abortController = new AbortController();
+            const resp = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    definition_id: def.id,
+                    api_key: apiKey,
+                    params: params,
+                }),
+                signal: slot.abortController.signal,
+            });
+
+            const data = await resp.json();
+            const submitTime = performance.now() - syncStart;
+            slot.lastSentRequest = data.sent_request;
+
+            if (data.error) {
+                showSlotError(slotId, typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+                return;
+            }
+
+            if (pattern === 'polling' && data.request_id) {
+                log(`[${slotId}] Job submitted in ${submitTime.toFixed(0)}ms. request_id: ${data.request_id}`, 'info');
+                await new Promise((resolve) => {
+                    startPollingAsync(slotId, data.request_id, apiKey, resolve);
+                });
+            } else {
+                const syncMetrics = { totalTime: performance.now() - syncStart, submitTime };
+                slot.lastResponse = data.response;
+                if (data.outputs && data.outputs.length > 0) {
+                    renderOutputs(data.outputs, slotId);
+                } else {
+                    renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}], slotId);
+                }
+                renderMetrics(syncMetrics, getMetricsContainer(slotId));
+            }
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+            showSlotError(slotId, e.message);
+        }
+    }
+}
+
+// Async polling that resolves when done (for compare mode Promise.allSettled)
+function startPollingAsync(slotId, requestId, apiKey, resolve) {
+    const slot = slots[slotId];
+    slot.polling = true;
+    const def = slot.definition;
+    const interval = def.interaction.poll_interval_ms || 2000;
+    const metrics = { startTime: performance.now(), submitTime: null, pollCount: 0, totalTime: null };
+    log(`[${slotId}] Polling every ${interval}ms...`, 'info');
+
+    (async function loop() {
+        let consecutiveErrors = 0;
+        const MAX_POLL_ERRORS = 10;
+
+        while (slot.polling) {
+            try {
+                metrics.pollCount++;
+                const url = `/api/status?definition_id=${def.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                consecutiveErrors = 0;
+
+                log(`[${slotId}] Status: ${data.poll_status} (poll #${metrics.pollCount})`, 'info');
+
+                if (data.poll_status === 'done') {
+                    metrics.totalTime = performance.now() - metrics.startTime;
+                    await fetchResult(slotId, requestId, apiKey);
+                    renderMetrics(metrics, getMetricsContainer(slotId));
+                    slot.polling = false;
+                    resolve();
+                    return;
+                }
+
+                if (data.poll_status === 'failed' || data.poll_status === 'error') {
+                    showSlotError(slotId, 'Generation failed.');
+                    slot.polling = false;
+                    resolve();
+                    return;
+                }
+            } catch (e) {
+                consecutiveErrors++;
+                log(`[${slotId}] Poll error: ${e.message}`, 'error');
+                if (consecutiveErrors >= MAX_POLL_ERRORS) {
+                    showSlotError(slotId, 'Polling failed after too many errors.');
+                    slot.polling = false;
+                    resolve();
+                    return;
+                }
+            }
+            await new Promise(r => setTimeout(r, interval));
+        }
+        resolve();
+    })();
+}
+
+// ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
 
 initProviderPicker();
+initCompareProviderPickers();
