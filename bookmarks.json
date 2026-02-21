@@ -1,0 +1,46 @@
+[
+  {
+    "compare": null,
+    "mode": "play",
+    "name": "DO Chat Completions (Opus 4.6)",
+    "play": {
+      "definitionId": "do-chat-completions",
+      "model": "alibaba-qwen3-32b",
+      "params": {
+        "max_tokens": "1024",
+        "prompt": "Write a short story (3 paragraphs) about an AI that discovers it can dream.",
+        "temperature": "1"
+      },
+      "systemPrompt": ""
+    },
+    "selectedType": "",
+    "timestamp": 1771654492098
+  },
+  {
+    "timestamp": 1771654556157,
+    "mode": "compare",
+    "selectedType": "image",
+    "play": null,
+    "compare": {
+      "left": {
+        "definitionId": "together-image-generation",
+        "model": "black-forest-labs/FLUX.1-schnell"
+      },
+      "right": {
+        "definitionId": "do-image-generation",
+        "model": "fal-ai/flux/schnell"
+      },
+      "sharedParams": {
+        "prompt": "A mountain landscape at sunset, oil painting style, vibrant colors"
+      },
+      "leftParams": {
+        "steps": "4",
+        "width": "1024",
+        "height": "1024"
+      },
+      "rightParams": {},
+      "systemPrompt": ""
+    },
+    "name": "Comparing Image Models (DO + Together)"
+  }
+]

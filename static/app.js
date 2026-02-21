@@ -137,10 +137,10 @@ function showApiKeyStatus(provider) {
     const name = PROVIDER_NAMES[provider] || provider;
     if (getApiKey(provider)) {
         el.textContent = `${name} key loaded`;
-        el.className = 'ml-auto text-xs text-green-600';
+        el.className = 'text-xs text-green-600';
     } else {
         el.textContent = `${name} key missing \u2014 add to .env`;
-        el.className = 'ml-auto text-xs text-amber-500';
+        el.className = 'text-xs text-amber-500';
     }
     el.classList.remove('hidden');
 }
@@ -1213,7 +1213,9 @@ function rebuildEndpointPicker() {
             picker.value = currentValue;
         } else {
             picker.value = '';
-            document.getElementById('playground').classList.add('hidden');
+            if (mode === 'play') {
+                document.getElementById('playground').classList.add('hidden');
+            }
             hideModelPicker();
             hideBaseUrl();
             slots.play.definition = null;
@@ -1676,6 +1678,16 @@ async function onCompareGenerate() {
     hideError();
     setGenerating(true);
 
+    // Update result column labels with provider + model
+    function slotLabel(def, modelVal) {
+        const provider = PROVIDER_NAMES[def.provider] || def.provider;
+        return modelVal ? `${provider} · ${modelVal}` : provider;
+    }
+    const leftLabelEl = document.getElementById('compareLeftLabel');
+    const rightLabelEl = document.getElementById('compareRightLabel');
+    if (leftLabelEl) leftLabelEl.textContent = slotLabel(leftDef, leftModel);
+    if (rightLabelEl) rightLabelEl.textContent = slotLabel(rightDef, rightModel);
+
     // Show compare results, clear previous
     const compareResults = document.getElementById('compareResults');
     compareResults.classList.remove('hidden');
@@ -1821,9 +1833,366 @@ function startPollingAsync(slotId, requestId, apiKey, resolve) {
 }
 
 // ---------------------------------------------------------------------------
+// Bookmarks
+// ---------------------------------------------------------------------------
+
+let bookmarks = [];
+
+async function loadBookmarks() {
+    try {
+        const resp = await fetch('/api/bookmarks');
+        bookmarks = await resp.json();
+    } catch (e) {
+        bookmarks = [];
+    }
+    return bookmarks;
+}
+
+async function saveBookmarksToServer(arr) {
+    bookmarks = arr;
+    try {
+        await fetch('/api/bookmarks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(arr),
+        });
+    } catch (e) {
+        log('Failed to save bookmarks: ' + e.message, 'error');
+    }
+}
+
+function collectFormParams(container) {
+    const params = {};
+    const fields = container.querySelectorAll('[data-param-name]');
+    for (const field of fields) {
+        const name = field.dataset.paramName;
+        if (field.tagName === 'DIV') {
+            // Slider wrapper — read the range input inside
+            const range = field.querySelector('input[type="range"]');
+            if (range) params[name] = range.value;
+        } else {
+            params[name] = field.value;
+        }
+    }
+    return params;
+}
+
+function captureBookmarkState() {
+    const state = {
+        timestamp: Date.now(),
+        mode: mode,
+        selectedType: selectedType,
+        play: null,
+        compare: null,
+    };
+
+    if (mode === 'play') {
+        const defPicker = document.getElementById('definitionPicker');
+        const modelPicker = document.getElementById('modelPicker');
+        const modelGroup = document.getElementById('modelPickerGroup');
+        const formContainer = document.getElementById('formFields');
+        const sysPrompt = document.getElementById('systemPromptInput');
+
+        state.play = {
+            definitionId: defPicker.value || null,
+            model: (!modelGroup.classList.contains('hidden') && modelPicker.value) ? modelPicker.value : null,
+            params: collectFormParams(formContainer),
+            systemPrompt: sysPrompt ? sysPrompt.value : '',
+        };
+    } else {
+        const leftEndpoint = document.getElementById('compareLeftEndpoint');
+        const rightEndpoint = document.getElementById('compareRightEndpoint');
+        const leftModel = document.getElementById('compareLeftModel');
+        const rightModel = document.getElementById('compareRightModel');
+        const sharedContainer = document.getElementById('formFields');
+        const leftParamsContainer = document.getElementById('compareLeftParams');
+        const rightParamsContainer = document.getElementById('compareRightParams');
+        const sysPrompt = document.getElementById('systemPromptInput');
+
+        state.compare = {
+            left: {
+                definitionId: leftEndpoint.value || null,
+                model: (!leftModel.classList.contains('hidden') && leftModel.value) ? leftModel.value : null,
+            },
+            right: {
+                definitionId: rightEndpoint.value || null,
+                model: (!rightModel.classList.contains('hidden') && rightModel.value) ? rightModel.value : null,
+            },
+            sharedParams: collectFormParams(sharedContainer),
+            leftParams: leftParamsContainer ? collectFormParams(leftParamsContainer) : {},
+            rightParams: rightParamsContainer ? collectFormParams(rightParamsContainer) : {},
+            systemPrompt: sysPrompt ? sysPrompt.value : '',
+        };
+    }
+
+    return state;
+}
+
+function fillFormFields(params, container) {
+    if (!params || !container) return;
+    for (const [name, value] of Object.entries(params)) {
+        const els = container.querySelectorAll(`[data-param-name="${name}"]`);
+        for (const el of els) {
+            if (el.tagName === 'DIV') {
+                // Slider wrapper
+                const range = el.querySelector('input[type="range"]');
+                if (range) {
+                    range.value = value;
+                    range.dispatchEvent(new Event('input'));
+                }
+            } else {
+                el.value = value;
+            }
+        }
+    }
+}
+
+async function restoreBookmark(bookmark) {
+    try {
+        // 1. Set mode
+        if (bookmark.mode && bookmark.mode !== mode) {
+            setMode(bookmark.mode);
+        }
+
+        // 2. Set type filter
+        if (bookmark.selectedType !== undefined) {
+            onTypeChange(bookmark.selectedType);
+        }
+
+        if (bookmark.mode === 'play' && bookmark.play) {
+            const bp = bookmark.play;
+            if (!bp.definitionId) return;
+
+            // Look up provider from DEFINITIONS_LIST
+            const defEntry = DEFINITIONS_LIST.find(d => d.id === bp.definitionId);
+            if (!defEntry) {
+                log('Bookmark error: definition not found — ' + bp.definitionId, 'error');
+                return;
+            }
+
+            // Set provider
+            const providerPicker = document.getElementById('providerPicker');
+            providerPicker.value = defEntry.provider;
+            onProviderChange();
+
+            // Set endpoint
+            const defPicker = document.getElementById('definitionPicker');
+            defPicker.value = bp.definitionId;
+            await onDefinitionChange();
+
+            // Set model
+            if (bp.model) {
+                const modelPicker = document.getElementById('modelPicker');
+                modelPicker.value = bp.model;
+            }
+
+            // Fill form fields
+            fillFormFields(bp.params, document.getElementById('formFields'));
+
+            // Set system prompt
+            if (bp.systemPrompt) {
+                const sysInput = document.getElementById('systemPromptInput');
+                sysInput.value = bp.systemPrompt;
+                // Expand it if it has content
+                sysInput.classList.remove('hidden');
+                document.getElementById('systemPromptArrow').innerHTML = '&#9660;';
+            }
+
+        } else if (bookmark.mode === 'compare' && bookmark.compare) {
+            const bc = bookmark.compare;
+
+            // Restore each side
+            for (const [sideKey, side] of [['left', 'Left'], ['right', 'Right']]) {
+                const sideData = bc[sideKey];
+                if (!sideData || !sideData.definitionId) continue;
+
+                const defEntry = DEFINITIONS_LIST.find(d => d.id === sideData.definitionId);
+                if (!defEntry) {
+                    log('Bookmark error: definition not found — ' + sideData.definitionId, 'error');
+                    continue;
+                }
+
+                // Set provider
+                const providerPicker = document.getElementById(`compare${side}Provider`);
+                providerPicker.value = defEntry.provider;
+                onCompareProviderChange(side);
+
+                // Set endpoint
+                const endpointPicker = document.getElementById(`compare${side}Endpoint`);
+                endpointPicker.value = sideData.definitionId;
+                await onCompareEndpointChange(side);
+
+                // Set model
+                if (sideData.model) {
+                    const modelPicker = document.getElementById(`compare${side}Model`);
+                    modelPicker.value = sideData.model;
+                }
+            }
+
+            // Fill shared form fields
+            fillFormFields(bc.sharedParams, document.getElementById('formFields'));
+
+            // Fill side-only params
+            fillFormFields(bc.leftParams, document.getElementById('compareLeftParams'));
+            fillFormFields(bc.rightParams, document.getElementById('compareRightParams'));
+
+            // Set system prompt
+            if (bc.systemPrompt) {
+                const sysInput = document.getElementById('systemPromptInput');
+                sysInput.value = bc.systemPrompt;
+                sysInput.classList.remove('hidden');
+                document.getElementById('systemPromptArrow').innerHTML = '&#9660;';
+            }
+        }
+
+        log('Bookmark restored.', 'info');
+    } catch (e) {
+        log('Bookmark restore error: ' + e.message, 'error');
+    }
+}
+
+async function addBookmark(name) {
+    const state = captureBookmarkState();
+    state.name = name;
+    bookmarks.push(state);
+    await saveBookmarksToServer(bookmarks);
+    renderBookmarkDropdown();
+}
+
+async function deleteBookmark(index) {
+    bookmarks.splice(index, 1);
+    await saveBookmarksToServer(bookmarks);
+    renderBookmarkDropdown();
+}
+
+function toggleBookmarkDropdown() {
+    const dropdown = document.getElementById('bookmarkDropdown');
+    const isHidden = dropdown.classList.contains('hidden');
+    if (isHidden) {
+        renderBookmarkDropdown();
+    }
+    dropdown.classList.toggle('hidden');
+}
+
+function generateBookmarkSubtitle(bookmark) {
+    if (bookmark.mode === 'play' && bookmark.play) {
+        const defEntry = DEFINITIONS_LIST.find(d => d.id === bookmark.play.definitionId);
+        const provider = defEntry ? (PROVIDER_NAMES[defEntry.provider] || defEntry.provider) : '?';
+        const model = bookmark.play.model || '';
+        return `play · ${provider}${model ? ' · ' + model : ''}`;
+    }
+    if (bookmark.mode === 'compare' && bookmark.compare) {
+        const leftDef = DEFINITIONS_LIST.find(d => d.id === bookmark.compare.left.definitionId);
+        const rightDef = DEFINITIONS_LIST.find(d => d.id === bookmark.compare.right.definitionId);
+        const leftProvider = leftDef ? (PROVIDER_NAMES[leftDef.provider] || leftDef.provider) : '?';
+        const rightProvider = rightDef ? (PROVIDER_NAMES[rightDef.provider] || rightDef.provider) : '?';
+        return `compare · ${leftProvider} vs ${rightProvider}`;
+    }
+    return bookmark.mode || '';
+}
+
+function renderBookmarkDropdown() {
+    const list = document.getElementById('bookmarkList');
+    list.innerHTML = '';
+
+    // "Save current" row
+    const saveRow = document.createElement('div');
+    saveRow.className = 'px-3 py-2 border-b border-gray-800';
+
+    const hasEndpoint = mode === 'play'
+        ? !!document.getElementById('definitionPicker').value
+        : !!(document.getElementById('compareLeftEndpoint').value || document.getElementById('compareRightEndpoint').value);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = hasEndpoint
+        ? 'text-xs text-blue-400 hover:text-blue-300 transition-colors w-full text-left'
+        : 'text-xs text-gray-600 cursor-not-allowed w-full text-left';
+    saveBtn.textContent = '+ Save current';
+    saveBtn.disabled = !hasEndpoint;
+
+    saveBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (!hasEndpoint) return;
+        // Replace the save button with an inline input
+        saveRow.innerHTML = '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Bookmark name...';
+        input.className = 'w-full bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500';
+        input.onkeydown = async (e) => {
+            if (e.key === 'Enter' && input.value.trim()) {
+                await addBookmark(input.value.trim());
+            }
+            if (e.key === 'Escape') {
+                renderBookmarkDropdown();
+            }
+        };
+        saveRow.appendChild(input);
+        setTimeout(() => input.focus(), 0);
+    };
+
+    saveRow.appendChild(saveBtn);
+    list.appendChild(saveRow);
+
+    // Bookmark entries
+    if (bookmarks.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'px-3 py-3 text-xs text-gray-600 text-center';
+        empty.textContent = 'No bookmarks yet';
+        list.appendChild(empty);
+    } else {
+        for (let i = 0; i < bookmarks.length; i++) {
+            const bm = bookmarks[i];
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 cursor-pointer group';
+
+            const info = document.createElement('div');
+            info.className = 'flex-1 min-w-0';
+            info.onclick = async () => {
+                document.getElementById('bookmarkDropdown').classList.add('hidden');
+                await restoreBookmark(bm);
+            };
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'text-xs text-gray-200 font-medium truncate';
+            nameEl.textContent = bm.name;
+
+            const subtitle = document.createElement('div');
+            subtitle.className = 'text-[10px] text-gray-500 truncate';
+            subtitle.textContent = generateBookmarkSubtitle(bm);
+
+            info.appendChild(nameEl);
+            info.appendChild(subtitle);
+            row.appendChild(info);
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'text-gray-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity shrink-0';
+            delBtn.textContent = '\u00d7';
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+                await deleteBookmark(i);
+            };
+            row.appendChild(delBtn);
+
+            list.appendChild(row);
+        }
+    }
+}
+
+// Close bookmark dropdown on outside click
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('bookmarkDropdown');
+    const btn = document.getElementById('bookmarkBtn');
+    if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+        dropdown.classList.add('hidden');
+    }
+});
+
+// ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
 
 initTypeFilter();
 initProviderPicker();
 initCompareProviderPickers();
+loadBookmarks();

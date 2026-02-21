@@ -26,7 +26,22 @@
             <!-- Type filter pills -->
             <div id="typeFilter" class="flex items-center gap-1"></div>
 
-            <p id="apiKeyStatus" class="ml-auto text-xs text-gray-600 hidden"></p>
+            <div class="ml-auto flex items-center gap-3">
+                <div class="relative">
+                    <button id="bookmarkBtn" onclick="toggleBookmarkDropdown()"
+                            class="text-gray-500 hover:text-gray-300 transition-colors text-xs flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                        </svg>
+                        Bookmarks
+                    </button>
+                    <div id="bookmarkDropdown" class="hidden absolute right-0 top-8 w-72 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 overflow-hidden">
+                        <div id="bookmarkList" class="max-h-64 overflow-y-auto"></div>
+                    </div>
+                </div>
+                <p id="apiKeyStatus" class="text-xs text-gray-600 hidden"></p>
+            </div>
         </div>
 
         <!-- Row 2: Play mode pickers -->
@@ -190,7 +205,7 @@
                 <!-- Left column -->
                 <div class="compare-column">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs text-gray-500 uppercase tracking-wider">Left</span>
+                        <span id="compareLeftLabel" class="text-xs text-gray-500 uppercase tracking-wider">Left</span>
                     </div>
                     <div id="compareLeftOutput" class="space-y-4 min-h-[60px]"></div>
                     <div id="compareLeftMetrics" class="mt-3"></div>
@@ -219,7 +234,7 @@
                 <!-- Right column -->
                 <div class="compare-column">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs text-gray-500 uppercase tracking-wider">Right</span>
+                        <span id="compareRightLabel" class="text-xs text-gray-500 uppercase tracking-wider">Right</span>
                     </div>
                     <div id="compareRightOutput" class="space-y-4 min-h-[60px]"></div>
                     <div id="compareRightMetrics" class="mt-3"></div>

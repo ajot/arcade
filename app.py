@@ -102,6 +102,27 @@ def index():
 # ---------------------------------------------------------------------------
 
 
+BOOKMARKS_FILE = os.path.join(os.path.dirname(__file__), "bookmarks.json")
+
+
+@app.route("/api/bookmarks")
+def get_bookmarks():
+    """Return saved bookmarks."""
+    if not os.path.exists(BOOKMARKS_FILE):
+        return jsonify([])
+    with open(BOOKMARKS_FILE) as f:
+        return jsonify(json.load(f))
+
+
+@app.route("/api/bookmarks", methods=["POST"])
+def save_bookmarks():
+    """Overwrite the full bookmarks array."""
+    data = request.get_json()
+    with open(BOOKMARKS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/definitions/<definition_id>")
 def get_definition(definition_id):
     """Return the full definition JSON for client-side use."""
