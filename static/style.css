@@ -1,0 +1,76 @@
+/* Progress bar animation */
+.animate-progress {
+    animation: progress 1.5s ease-in-out infinite;
+}
+
+@keyframes progress {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+}
+
+/* Log drawer open state */
+.log-drawer-open {
+    transform: translateY(0) !important;
+}
+
+/* Log console */
+.log-console {
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.log-entry {
+    padding: 2px 0;
+    word-break: break-all;
+}
+
+.log-request { color: #60a5fa; }
+.log-response { color: #34d399; }
+.log-error { color: #f87171; }
+.log-info { color: #6b7280; }
+
+/* Generate button spinner */
+.btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Streaming cursor blink */
+.streaming-cursor::after {
+    content: '\25AE';
+    animation: blink 0.8s step-end infinite;
+    color: #60a5fa;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+/* Form field focus ring */
+select:focus, input:focus, textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+/* Tailwind overrides for top bar selects */
+header select {
+    background-image: none;
+}

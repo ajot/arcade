@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "do-stable-audio",
+  "provider": "digitalocean",
+  "name": "Stable Audio 2.5 (Text to Audio)",
+  "description": "Text-to-audio generation via Stable Audio on DigitalOcean GenAI",
+  "auth": {
+    "type": "header",
+    "header": "Authorization",
+    "prefix": "Bearer "
+  },
+  "request": {
+    "method": "POST",
+    "url": "https://inference.do-ai.run/v1/async-invoke",
+    "content_type": "application/json",
+    "body_template": {
+      "model_id": "fal-ai/stable-audio-25/text-to-audio",
+      "input": {}
+    },
+    "params": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "ui": "textarea",
+        "required": true,
+        "body_path": "input.prompt",
+        "placeholder": "Upbeat electronic music with synth leads..."
+      }
+    ]
+  },
+  "interaction": {
+    "pattern": "polling",
+    "status_url": "https://inference.do-ai.run/v1/async-invoke/{request_id}/status",
+    "result_url": "https://inference.do-ai.run/v1/async-invoke/{request_id}",
+    "request_id_path": "$.request_id",
+    "poll_interval_ms": 2000,
+    "done_when": { "path": "$.status", "equals": "COMPLETED" },
+    "failed_when": { "path": "$.status", "in": ["FAILED", "ERROR"] }
+  },
+  "examples": [
+    {
+      "label": "Synth wave",
+      "params": { "prompt": "Upbeat synthwave track with retro 80s vibes, pulsing bass, and shimmering arpeggios" }
+    },
+    {
+      "label": "Ambient rain",
+      "params": { "prompt": "Gentle ambient soundscape with soft rain, distant thunder, and wind through trees" }
+    },
+    {
+      "label": "Jazz piano",
+      "params": { "prompt": "Smooth jazz piano trio, upright bass, brushed drums, late night club atmosphere" }
+    },
+    {
+      "label": "Epic cinematic",
+      "params": { "prompt": "Epic cinematic orchestral trailer music with rising strings, brass hits, and thundering drums" }
+    }
+  ],
+  "response": {
+    "outputs": [
+      { "path": "$..url", "type": "audio", "source": "url", "downloadable": true }
+    ],
+    "error": { "path": "$.error.message" }
+  }
+}

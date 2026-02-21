@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arcade</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+    <!-- Top bar -->
+    <header class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
+        <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 h-14">
+            <span class="text-sm font-semibold text-white tracking-tight mr-4">arcade</span>
+
+            <select id="providerPicker" onchange="onProviderChange()"
+                    class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                <option value="">All Providers</option>
+            </select>
+
+            <select id="definitionPicker" onchange="onDefinitionChange()"
+                    class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                <option value="">Select endpoint...</option>
+                {% for d in definitions %}
+                <option value="{{ d.id }}">{{ d.name }}</option>
+                {% endfor %}
+            </select>
+
+            <div id="modelPickerGroup" class="hidden">
+                <select id="modelPicker"
+                        class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                </select>
+            </div>
+
+            <div class="ml-auto flex items-center gap-2">
+                <button id="apiKeyToggle" onclick="toggleApiKeyInput()" class="text-gray-500 hover:text-gray-300 transition-colors" title="API Key">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </button>
+                <div id="apiKeyWrapper" class="hidden">
+                    <input type="password" id="apiKey" placeholder="API key"
+                           class="bg-gray-900 border border-gray-800 rounded-md px-2 py-1 text-sm text-white w-48 focus:outline-none focus:border-blue-500">
+                </div>
+                <p id="apiKeyHint" class="text-xs text-gray-600 hidden"></p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Progress bar -->
+    <div id="progressBar" class="fixed top-14 left-0 right-0 z-30 hidden">
+        <div class="h-0.5 bg-blue-500 animate-progress"></div>
+    </div>
+
+    <!-- Main centered column -->
+    <main class="max-w-[720px] mx-auto px-6 pt-24 pb-24">
+
+        <!-- Endpoint info -->
+        <div id="playground" class="hidden">
+            <div class="mb-8">
+                <h2 id="endpointName" class="text-lg font-light text-white mb-1"></h2>
+                <p id="endpointDescription" class="text-sm text-gray-500"></p>
+                <p id="baseUrl" class="text-xs text-gray-600 font-mono mt-1 hidden"></p>
+            </div>
+
+            <!-- Examples -->
+            <div id="examplesRow" class="mb-6 hidden">
+                <div id="exampleButtons" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Form fields -->
+            <div id="formFields" class="space-y-5"></div>
+
+            <!-- Generate button -->
+            <div class="mt-6">
+                <button id="generateBtn" onclick="onGenerate()"
+                        class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors">
+                    Generate
+                </button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden mt-10">
+            <div class="flex items-center justify-between mb-4">
+                <div class="h-px flex-1 bg-gray-800"></div>
+                <span class="px-3 text-xs text-gray-600 uppercase tracking-wider">Result</span>
+                <div class="h-px flex-1 bg-gray-800"></div>
+            </div>
+            <!-- Rendered output -->
+            <div id="renderedOutput" class="space-y-4"></div>
+            <!-- JSON toggle -->
+            <div class="mt-4">
+                <button id="jsonToggleBtn" onclick="toggleJson()"
+                        class="text-xs text-gray-600 hover:text-gray-400 font-mono transition-colors">
+                    { }
+                </button>
+            </div>
+            <!-- Raw JSON (hidden by default) -->
+            <div id="jsonView" class="hidden mt-3 space-y-3">
+                <div>
+                    <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Request</h4>
+                    <pre id="jsonRequest" class="bg-gray-900 rounded-md p-3 text-xs text-green-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+                </div>
+                <div>
+                    <h4 class="text-xs text-gray-600 mb-1 uppercase tracking-wider">Response</h4>
+                    <pre id="jsonResponse" class="bg-gray-900 rounded-md p-3 text-xs text-blue-400/80 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error display -->
+        <div id="errorDisplay" class="hidden mt-6">
+            <div class="border border-red-900/50 rounded-md px-4 py-3">
+                <p id="errorMessage" class="text-red-400 text-sm"></p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Log drawer -->
+    <div id="logDrawer" class="fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 translate-y-full">
+        <div class="bg-gray-950 border-t border-gray-800" style="height: 300px;">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+                <span class="text-xs text-gray-500 uppercase tracking-wider">Log</span>
+                <div class="flex items-center gap-3">
+                    <button onclick="clearLog()" class="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+                    <button onclick="toggleLogDrawer()" class="text-xs text-gray-600 hover:text-gray-400">Close</button>
+                </div>
+            </div>
+            <div id="logConsole" class="log-console overflow-y-auto px-4 py-2" style="height: 260px;"></div>
+        </div>
+    </div>
+
+    <!-- Log drawer toggle pill -->
+    <button id="logPill" onclick="toggleLogDrawer()"
+            class="fixed bottom-4 right-4 z-40 bg-gray-900 border border-gray-800 rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 hover:border-gray-700 transition-colors">
+        Log <span id="logCount" class="ml-1 text-gray-600 hidden">0</span>
+    </button>
+
+    <script>
+        const API_KEYS = {{ api_keys | tojson }};
+        const DEFINITIONS_LIST = {{ definitions | tojson }};
+    </script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
