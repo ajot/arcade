@@ -10,7 +10,7 @@ Generate a new definition JSON file for an AI provider endpoint in this arcade p
 
 ## Steps
 
-1. **Parse the request** — Identify the provider, endpoint type (chat, image, tts, audio, video, music), and any specific models or filters mentioned.
+1. **Parse the request** — Identify the provider, endpoint type (chat, image, tts, audio, video, music), and any specific models or filters mentioned. If the user only specifies a provider without an endpoint type, ask which type(s) they want before proceeding.
 
 2. **Check for existing definitions** — Look in `definitions/<provider>/` to see if a definition already exists for this endpoint type. If it does, warn the user before overwriting.
 
