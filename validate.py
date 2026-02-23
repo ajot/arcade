@@ -173,6 +173,8 @@ def validate_definition(path):
         for part in parts[:-1]:
             if isinstance(obj, dict) and part in obj:
                 obj = obj[part]
+            elif isinstance(obj, list) and part.isdigit() and int(part) < len(obj):
+                obj = obj[int(part)]
             else:
                 valid = False
                 break

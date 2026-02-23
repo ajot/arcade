@@ -58,6 +58,9 @@ def build_request(definition, params, api_key):
         name = param_def["name"]
         if name not in params:
             continue
+        # url_path params are substituted into the URL, not the body
+        if param_def.get("url_path"):
+            continue
         value = params[name]
         # Coerce types
         if param_def.get("type") == "integer":
@@ -80,7 +83,13 @@ def build_request(definition, params, api_key):
     if "messages" in body and system_prompt:
         body["messages"].insert(0, {"role": "system", "content": system_prompt})
 
+    # Substitute url_path params into the URL template (e.g. {model})
     url = req["url"]
+    for param_def in req.get("params", []):
+        if param_def.get("url_path"):
+            name = param_def["name"]
+            if name in params:
+                url = url.replace(f"{{{name}}}", str(params[name]))
     return url, headers, body
 
 
@@ -181,13 +190,23 @@ def extract_outputs(definition, response_data):
 # --- Internal helpers ---
 
 def _set_nested(obj, path, value):
-    """Set a value in a nested dict using dot-separated path."""
+    """Set a value in a nested dict/list using dot-separated path.
+
+    Numeric segments are treated as list indices (e.g. 'instances.0.prompt').
+    """
     keys = path.split(".")
     for key in keys[:-1]:
-        if key not in obj:
-            obj[key] = {}
-        obj = obj[key]
-    obj[keys[-1]] = value
+        if key.isdigit():
+            obj = obj[int(key)]
+        else:
+            if key not in obj:
+                obj[key] = {}
+            obj = obj[key]
+    final = keys[-1]
+    if final.isdigit():
+        obj[int(final)] = value
+    else:
+        obj[final] = value
 
 
 def _recursive_find(data, key):

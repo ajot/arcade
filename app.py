@@ -219,6 +219,14 @@ def generate():
     if resp.ok and interaction.get("pattern") not in ("polling", "streaming"):
         outputs = extract_outputs(defn, resp_data)
         if outputs:
+            # Convert base64 image/audio values to data URLs for client rendering
+            for output_def, output in zip(defn.get("response", {}).get("outputs", []), outputs):
+                if output_def.get("source") == "base64" and output["type"] in ("image", "audio"):
+                    mime = output_def.get("mime_type", "image/png" if output["type"] == "image" else "audio/wav")
+                    output["value"] = [
+                        f"data:{mime};base64,{v}" if v and not v.startswith("data:") else v
+                        for v in output["value"]
+                    ]
             result["outputs"] = outputs
 
     # Check for provider errors
