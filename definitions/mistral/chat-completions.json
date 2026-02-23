@@ -25,7 +25,14 @@
         "type": "enum",
         "options": [
           "mistral-large-latest",
+          "mistral-medium-latest",
           "mistral-small-latest",
+          "pixtral-large-latest",
+          "magistral-medium-latest",
+          "magistral-small-latest",
+          "ministral-3-8b-25-12",
+          "ministral-3-3b-25-12",
+          "mistral-saba-latest",
           "codestral-latest"
         ],
         "default": "mistral-large-latest",

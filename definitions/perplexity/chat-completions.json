@@ -25,7 +25,9 @@
         "options": [
           "sonar-pro",
           "sonar",
-          "sonar-reasoning-pro"
+          "sonar-reasoning-pro",
+          "sonar-reasoning",
+          "sonar-deep-research"
         ],
         "default": "sonar-pro",
         "ui": "dropdown",
