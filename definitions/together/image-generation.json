@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "together-image-generation",
   "provider": "together",
+  "provider_url": "together.ai",
   "name": "Together AI Image Generation",
   "description": "Text-to-image generation via Together AI (FLUX, Stable Diffusion, and more)",
   "auth": {

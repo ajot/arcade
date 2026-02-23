@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "groq-chat-completions",
   "provider": "groq",
+  "provider_url": "groq.com",
   "name": "Groq Chat Completions",
   "description": "Groq chat with streaming (OpenAI-compatible)",
   "auth": {

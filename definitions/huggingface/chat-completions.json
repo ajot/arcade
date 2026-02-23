@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "huggingface-chat-completions",
   "provider": "huggingface",
+  "provider_url": "huggingface.co",
   "name": "Hugging Face Chat Completions",
   "description": "Hugging Face chat with streaming (OpenAI-compatible)",
   "auth": {

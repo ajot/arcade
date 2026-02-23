@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "deepseek-chat-completions",
   "provider": "deepseek",
+  "provider_url": "deepseek.com",
   "name": "DeepSeek Chat Completions",
   "description": "DeepSeek chat with streaming (OpenAI-compatible)",
   "auth": {

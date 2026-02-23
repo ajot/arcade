@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "together-text-to-speech",
   "provider": "together",
+  "provider_url": "together.ai",
   "name": "Together AI Text to Speech",
   "description": "Text-to-speech via Together AI (Orpheus, Kokoro, Cartesia Sonic)",
   "auth": {

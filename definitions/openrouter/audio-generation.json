@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "openrouter-audio-generation",
   "provider": "openrouter",
+  "provider_url": "openrouter.ai",
   "name": "OpenRouter Audio Generation",
   "description": "Audio output via OpenRouter (GPT Audio models)",
   "auth": {

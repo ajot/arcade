@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "do-music-generation",
   "provider": "digitalocean",
+  "provider_url": "digitalocean.com",
   "name": "DigitalOcean Music Generation",
   "description": "Stable Audio 2.5 music generation via DigitalOcean GenAI",
   "auth": {

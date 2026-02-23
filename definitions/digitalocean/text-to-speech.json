@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "do-text-to-speech",
   "provider": "digitalocean",
+  "provider_url": "digitalocean.com",
   "name": "DigitalOcean Text-to-Speech",
   "description": "ElevenLabs multilingual TTS via DigitalOcean GenAI",
   "auth": {

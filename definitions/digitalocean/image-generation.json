@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "do-image-generation",
   "provider": "digitalocean",
+  "provider_url": "digitalocean.com",
   "name": "DigitalOcean Image Generation",
   "description": "Text-to-image generation via DigitalOcean GenAI",
   "auth": {

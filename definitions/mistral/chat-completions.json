@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "mistral-chat-completions",
   "provider": "mistral",
+  "provider_url": "mistral.ai",
   "name": "Mistral AI Chat Completions",
   "description": "Mistral AI chat with streaming (OpenAI-compatible)",
   "auth": {

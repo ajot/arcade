@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "openai-chat-completions",
   "provider": "openai",
+  "provider_url": "openai.com",
   "name": "OpenAI Chat Completions",
   "description": "GPT-4o / GPT-4o-mini chat with streaming",
   "auth": {

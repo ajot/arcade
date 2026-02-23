@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "google-chat-completions",
   "provider": "google",
+  "provider_url": "ai.google.dev",
   "name": "Google Gemini Chat Completions",
   "description": "Google Gemini chat with streaming (OpenAI-compatible)",
   "auth": {
