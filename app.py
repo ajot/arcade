@@ -153,7 +153,11 @@ def preview():
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
-    curl = build_curl_string(defn, params)
+    try:
+        curl = build_curl_string(defn, params)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
     return jsonify({"curl": curl})
 
 
@@ -180,7 +184,10 @@ def generate():
     if not api_key:
         return jsonify({"error": f"No API key configured for provider '{defn['provider']}'"}), 400
 
-    url, headers, body = build_request(defn, params, api_key)
+    try:
+        url, headers, body = build_request(defn, params, api_key)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     try:
         resp = http_requests.request(
@@ -251,7 +258,11 @@ def stream():
     if not api_key:
         return jsonify({"error": f"No API key configured for provider '{defn['provider']}'"}), 400
 
-    url, headers, body = build_request(defn, params, api_key)
+    try:
+        url, headers, body = build_request(defn, params, api_key)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
     stream_path = defn.get("interaction", {}).get("stream_path", "")
 
     def generate():

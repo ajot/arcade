@@ -529,6 +529,30 @@ function renderPaletteModelList(query) {
         paletteItems.push({ type: 'model', value: model });
     }
 
+    // --- Save as bookmark row ---
+    const hasLoadedEndpoint = (mode === 'play' && slots.play.definition)
+        || (mode === 'compare' && (slots.left.definition || slots.right.definition));
+    if (hasLoadedEndpoint && (!q || 'save bookmark'.includes(q))) {
+        const saveIdx = paletteItems.length;
+        const saveItem = document.createElement('div');
+        saveItem.className = 'palette-item' + (saveIdx === 0 ? ' palette-highlighted' : '');
+        saveItem.dataset.index = saveIdx;
+
+        const saveLeft = document.createElement('span');
+        saveLeft.innerHTML = '<span style="color:#6b7280;margin-right:6px;">+</span>'
+            + '<span class="palette-item-name" style="color:#9ca3af;">Save as bookmark...</span>';
+
+        saveItem.appendChild(saveLeft);
+        saveItem.onmouseenter = () => highlightPaletteItem(saveIdx);
+        saveItem.onclick = (e) => {
+            e.stopPropagation();
+            startInlineBookmarkSave(saveItem);
+        };
+        list.appendChild(saveItem);
+
+        paletteItems.push({ type: 'save-bookmark' });
+    }
+
     if (paletteItems.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'px-4 py-6 text-center text-xs text-gray-500';
@@ -683,6 +707,14 @@ async function finalizeSelection(defId, modelValue, isCompare) {
 function selectPaletteModelItem(idx) {
     if (idx < 0 || idx >= paletteItems.length) return;
     const item = paletteItems[idx];
+
+    if (item.type === 'save-bookmark') {
+        const list = document.getElementById('cmdPaletteList');
+        const rowEl = list.querySelector(`.palette-item[data-index="${idx}"]`);
+        if (rowEl) startInlineBookmarkSave(rowEl);
+        return;
+    }
+
     if (item.type !== 'model') return;
     const defId = palettePendingDefId;
     const modelValue = item.value;
@@ -1346,17 +1378,21 @@ function renderOutputs(outputs, slotId) {
     log(`[${slotId}] Result rendered.`, 'response');
 }
 
+function isSafeUrl(url) {
+    return typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:'));
+}
+
 function createImageRenderer(url, downloadable) {
     const div = document.createElement('div');
     div.className = 'space-y-3';
 
     const img = document.createElement('img');
-    img.src = url;
+    img.src = isSafeUrl(url) ? url : '';
     img.alt = 'Generated image';
     img.className = 'max-w-full rounded-md';
     div.appendChild(img);
 
-    if (downloadable) {
+    if (downloadable && isSafeUrl(url)) {
         const link = document.createElement('a');
         link.href = url;
         link.download = 'generated-image';
@@ -1378,11 +1414,11 @@ function createVideoRenderer(url, downloadable) {
     video.autoplay = true;
     video.className = 'max-w-full rounded-md';
     const source = document.createElement('source');
-    source.src = url;
+    source.src = isSafeUrl(url) ? url : '';
     video.appendChild(source);
     div.appendChild(video);
 
-    if (downloadable) {
+    if (downloadable && isSafeUrl(url)) {
         const link = document.createElement('a');
         link.href = url;
         link.download = 'generated-video';
@@ -1409,11 +1445,11 @@ function createAudioRenderer(url, downloadable) {
     audio.autoplay = true;
     audio.className = 'w-full';
     const source = document.createElement('source');
-    source.src = url;
+    source.src = isSafeUrl(url) ? url : '';
     audio.appendChild(source);
     div.appendChild(audio);
 
-    if (downloadable) {
+    if (downloadable && isSafeUrl(url)) {
         const link = document.createElement('a');
         link.href = url;
         link.download = 'generated-audio';
@@ -2367,11 +2403,16 @@ function startInlineBookmarkSave(rowEl) {
     // Prevent palette input from stealing keys
     input.addEventListener('keydown', async (e) => {
         e.stopPropagation();
+        const rerender = () => {
+            const q = document.getElementById('cmdPaletteInput').value;
+            if (paletteStep === 'model') renderPaletteModelList(q);
+            else renderPaletteList(q);
+        };
         if (e.key === 'Enter' && input.value.trim()) {
             await addBookmark(input.value.trim());
-            renderPaletteList(document.getElementById('cmdPaletteInput').value);
+            rerender();
         } else if (e.key === 'Escape') {
-            renderPaletteList(document.getElementById('cmdPaletteInput').value);
+            rerender();
         }
     });
 

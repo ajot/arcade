@@ -88,6 +88,14 @@ def validate_definition(path):
     if not has_required:
         errors.append("At least one param must be required: true")
 
+    # Check for duplicate param names
+    param_names = [p.get("name") for p in params if "name" in p]
+    seen = set()
+    for pn in param_names:
+        if pn in seen:
+            errors.append(f"Duplicate param name: '{pn}'")
+        seen.add(pn)
+
     # --- Interaction checks ---
     interaction = defn.get("interaction", {})
     pattern = interaction.get("pattern", "")
@@ -160,6 +168,13 @@ def validate_definition(path):
             for rp in required_param_names:
                 if rp not in ex["params"]:
                     errors.append(f"Example '{ex.get('label', i)}' missing required param '{rp}'")
+            # Validate enum param values match declared options
+            for p in params:
+                pn = p.get("name", "")
+                if p.get("type") == "enum" and "options" in p and pn in ex["params"]:
+                    val = ex["params"][pn]
+                    if val not in p["options"]:
+                        errors.append(f"Example '{ex.get('label', i)}' param '{pn}' value '{val}' not in options {p['options']}")
 
     # --- Cross-reference: body_path checks ---
     body_template = req.get("body_template", {})
