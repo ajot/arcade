@@ -4,7 +4,7 @@
   "provider": "openrouter",
   "provider_url": "openrouter.ai",
   "name": "OpenRouter Image Generation",
-  "description": "Image generation via OpenRouter (GPT Image, Gemini Image)",
+  "description": "Image generation via OpenRouter (GPT Image, Gemini Image, FLUX, Seedream, Riverflow)",
   "auth": {
     "type": "header",
     "header": "Authorization",
@@ -27,7 +27,15 @@
           "google/gemini-2.5-flash-image",
           "google/gemini-3-pro-image-preview",
           "openai/gpt-5-image",
-          "openai/gpt-5-image-mini"
+          "openai/gpt-5-image-mini",
+          "black-forest-labs/flux.2-pro",
+          "black-forest-labs/flux.2-max",
+          "black-forest-labs/flux.2-flex",
+          "black-forest-labs/flux.2-klein-4b",
+          "bytedance-seed/seedream-4.5",
+          "sourceful/riverflow-v2-pro",
+          "sourceful/riverflow-v2-fast",
+          "sourceful/riverflow-v2-standard-preview"
         ],
         "default": "google/gemini-2.5-flash-image",
         "ui": "dropdown",

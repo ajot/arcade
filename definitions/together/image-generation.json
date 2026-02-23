@@ -22,6 +22,7 @@
         "name": "model",
         "type": "enum",
         "options": [
+          "black-forest-labs/FLUX.1-schnell-Free",
           "black-forest-labs/FLUX.1-schnell",
           "black-forest-labs/FLUX.1-dev",
           "black-forest-labs/FLUX.1-dev-lora",
@@ -49,7 +50,6 @@
           "Qwen/Qwen-Image",
           "RunDiffusion/Juggernaut-pro-flux",
           "Rundiffusion/Juggernaut-Lightning-Flux",
-          "Wan-AI/Wan2.6-image",
           "stabilityai/stable-diffusion-3-medium",
           "stabilityai/stable-diffusion-xl-base-1.0"
         ],

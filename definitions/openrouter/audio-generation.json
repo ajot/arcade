@@ -32,11 +32,11 @@
         "name": "model",
         "type": "enum",
         "options": [
-          "openai/gpt-4o-audio-preview",
           "openai/gpt-audio",
-          "openai/gpt-audio-mini"
+          "openai/gpt-audio-mini",
+          "openai/gpt-4o-audio-preview"
         ],
-        "default": "openai/gpt-4o-audio-preview",
+        "default": "openai/gpt-audio",
         "ui": "dropdown",
         "required": true
       },
@@ -58,14 +58,14 @@
       "label": "Greeting",
       "params": {
         "prompt": "Say hello and introduce yourself in a friendly tone.",
-        "model": "openai/gpt-4o-audio-preview"
+        "model": "openai/gpt-audio"
       }
     },
     {
       "label": "Story time",
       "params": {
         "prompt": "Tell a very short bedtime story about a brave little star.",
-        "model": "openai/gpt-4o-audio-preview"
+        "model": "openai/gpt-audio"
       }
     }
   ],
