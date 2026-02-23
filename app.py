@@ -214,7 +214,8 @@ def generate():
         else:
             resp_data = resp.json()
     except http_requests.RequestException as e:
-        return jsonify({"error": str(e)}), 502
+        app.logger.error("Generate request failed: %s", e)
+        return jsonify({"error": "Upstream request failed"}), 502
     except ValueError:
         return jsonify({"error": "Non-JSON response from provider"}), 502
 
@@ -299,7 +300,8 @@ def stream():
             yield f"event: done\ndata: {{}}\n\n"
 
         except http_requests.RequestException as e:
-            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            app.logger.error("Stream request failed: %s", e)
+            yield f"event: error\ndata: {json.dumps({'error': 'Upstream request failed'})}\n\n"
 
     return Response(generate(), mimetype="text/event-stream")
 
@@ -325,7 +327,8 @@ def check_status():
         resp = http_requests.get(url, headers=headers, timeout=15)
         resp_data = resp.json()
     except (http_requests.RequestException, ValueError) as e:
-        return jsonify({"error": str(e), "poll_status": "error"}), 502
+        app.logger.error("Status check failed: %s", e)
+        return jsonify({"error": "Upstream request failed", "poll_status": "error"}), 502
 
     poll_status = check_done(defn, resp_data)
     return jsonify({"poll_status": poll_status, "response": resp_data})
@@ -352,7 +355,8 @@ def get_result():
         resp = http_requests.get(url, headers=headers, timeout=30)
         resp_data = resp.json()
     except (http_requests.RequestException, ValueError) as e:
-        return jsonify({"error": str(e)}), 502
+        app.logger.error("Result fetch failed: %s", e)
+        return jsonify({"error": "Upstream request failed"}), 502
 
     outputs = extract_outputs(defn, resp_data)
     return jsonify({"response": resp_data, "outputs": outputs})
