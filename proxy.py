@@ -1,5 +1,40 @@
 import copy
+import json
 import re
+
+
+def build_auth_headers(definition, api_key):
+    """Build authentication headers from a definition's auth config."""
+    headers = {}
+    auth = definition.get("auth", {})
+    if auth.get("type") == "header":
+        prefix = auth.get("prefix", "")
+        headers[auth["header"]] = f"{prefix}{api_key}"
+    return headers
+
+
+def build_curl_string(definition, params, api_key_placeholder="<API_KEY>"):
+    """Build a curl command string from a definition and params.
+
+    Uses build_request() internally but replaces the real API key with a
+    placeholder so no secrets leak into the UI.
+    """
+    url, headers, body = build_request(definition, params, api_key="PLACEHOLDER")
+
+    # Replace the placeholder API key in auth headers
+    auth = definition.get("auth", {})
+    if auth.get("type") == "header":
+        header_name = auth["header"]
+        prefix = auth.get("prefix", "")
+        headers[header_name] = f"{prefix}{api_key_placeholder}"
+
+    method = definition["request"].get("method", "POST").upper()
+    parts = [f"curl -X {method} '{url}'"]
+    for key, value in headers.items():
+        parts.append(f"  -H '{key}: {value}'")
+    if body:
+        parts.append(f"  -d '{json.dumps(body, indent=2)}'")
+    return " \\\n".join(parts)
 
 
 def build_request(definition, params, api_key):
@@ -11,10 +46,7 @@ def build_request(definition, params, api_key):
 
     # Build headers
     headers = {"Content-Type": req.get("content_type", "application/json")}
-    auth = definition.get("auth", {})
-    if auth.get("type") == "header":
-        prefix = auth.get("prefix", "")
-        headers[auth["header"]] = f"{prefix}{api_key}"
+    headers.update(build_auth_headers(definition, api_key))
 
     # Merge any static headers from the definition
     for k, v in req.get("headers", {}).items():

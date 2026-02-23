@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
 from proxy import (
+    build_auth_headers,
+    build_curl_string,
     build_request,
     build_result_url,
     build_status_url,
@@ -81,6 +83,23 @@ load_definitions()
 # ---------------------------------------------------------------------------
 
 
+PROVIDER_DISPLAY_NAMES = {
+    "deepinfra": "DeepInfra",
+    "deepseek": "DeepSeek",
+    "digitalocean": "DigitalOcean",
+    "huggingface": "Hugging Face",
+    "openai": "OpenAI",
+    "openrouter": "OpenRouter",
+    "sambanova": "SambaNova",
+    "together": "Together AI",
+}
+
+
+def provider_display_name(slug):
+    """Return display name for a provider slug, falling back to title case."""
+    return PROVIDER_DISPLAY_NAMES.get(slug, slug.title())
+
+
 @app.route("/")
 def index():
     """Render the main playground page."""
@@ -89,17 +108,30 @@ def index():
             "id": d["id"],
             "name": d["name"],
             "provider": d["provider"],
+            "provider_display_name": provider_display_name(d["provider"]),
             "output_type": d.get("response", {}).get("outputs", [{}])[0].get("type", "text"),
         }
         for d in DEFINITIONS.values()
     ]
     definitions_list.sort(key=lambda d: d["name"])
-    return render_template("index.html", definitions=definitions_list, api_keys=API_KEYS)
+    return render_template(
+        "index.html",
+        definitions=definitions_list,
+        api_keys=list(API_KEYS.keys()),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Routes — API
 # ---------------------------------------------------------------------------
+
+
+def get_api_key(definition_id):
+    """Look up the API key for a definition's provider, server-side."""
+    defn = DEFINITIONS.get(definition_id)
+    if not defn:
+        return None, None
+    return defn, API_KEYS.get(defn["provider"], "")
 
 
 BOOKMARKS_FILE = os.path.join(os.path.dirname(__file__), "bookmarks.json")
@@ -123,6 +155,21 @@ def save_bookmarks():
     return jsonify({"ok": True})
 
 
+@app.route("/api/preview", methods=["POST"])
+def preview():
+    """Return a curl command string for the given definition and params."""
+    data = request.get_json()
+    definition_id = data.get("definition_id")
+    params = data.get("params", {})
+
+    defn = DEFINITIONS.get(definition_id)
+    if not defn:
+        return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
+
+    curl = build_curl_string(defn, params)
+    return jsonify({"curl": curl})
+
+
 @app.route("/api/definitions/<definition_id>")
 def get_definition(definition_id):
     """Return the full definition JSON for client-side use."""
@@ -137,25 +184,16 @@ def generate():
     """Submit a generation request to the provider API."""
     data = request.get_json()
     definition_id = data.get("definition_id")
-    api_key = data.get("api_key", "")
     params = data.get("params", {})
 
-    defn = DEFINITIONS.get(definition_id)
+    defn, api_key = get_api_key(definition_id)
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
     if not api_key:
-        return jsonify({"error": "API key is required"}), 400
+        return jsonify({"error": f"No API key configured for provider '{defn['provider']}'"}), 400
 
     url, headers, body = build_request(defn, params, api_key)
-
-    # Capture the outbound request for the JSON toggle
-    sent_request = {
-        "method": defn["request"]["method"],
-        "url": url,
-        "headers": {k: ("***" if "authorization" in k.lower() else v) for k, v in headers.items()},
-        "body": body,
-    }
 
     try:
         resp = http_requests.request(
@@ -176,13 +214,13 @@ def generate():
         else:
             resp_data = resp.json()
     except http_requests.RequestException as e:
-        return jsonify({"error": str(e), "sent_request": sent_request}), 502
+        return jsonify({"error": str(e)}), 502
     except ValueError:
-        return jsonify({"error": "Non-JSON response from provider", "sent_request": sent_request}), 502
+        return jsonify({"error": "Non-JSON response from provider"}), 502
 
     # For polling patterns, extract the request_id
     interaction = defn.get("interaction", {})
-    result = {"sent_request": sent_request, "response": resp_data, "status_code": resp.status_code}
+    result = {"response": resp_data, "status_code": resp.status_code}
 
     if interaction.get("pattern") == "polling" and resp.ok:
         rid_path = interaction.get("request_id_path", "$.request_id")
@@ -208,32 +246,19 @@ def stream():
     """Proxy a streaming SSE request to the provider and forward chunks."""
     data = request.get_json()
     definition_id = data.get("definition_id")
-    api_key = data.get("api_key", "")
     params = data.get("params", {})
 
-    defn = DEFINITIONS.get(definition_id)
+    defn, api_key = get_api_key(definition_id)
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
     if not api_key:
-        return jsonify({"error": "API key is required"}), 400
+        return jsonify({"error": f"No API key configured for provider '{defn['provider']}'"}), 400
 
     url, headers, body = build_request(defn, params, api_key)
-
-    # Capture the outbound request for the JSON toggle
-    sent_request = {
-        "method": defn["request"]["method"],
-        "url": url,
-        "headers": {k: ("***" if "authorization" in k.lower() else v) for k, v in headers.items()},
-        "body": body,
-    }
-
     stream_path = defn.get("interaction", {}).get("stream_path", "")
 
     def generate():
-        # Send the request info as the first event
-        yield f"event: request_info\ndata: {json.dumps(sent_request)}\n\n"
-
         try:
             resp = http_requests.request(
                 method=defn["request"]["method"],
@@ -283,19 +308,14 @@ def stream():
 def check_status():
     """Check the status of an async job."""
     definition_id = request.args.get("definition_id")
-    api_key = request.args.get("api_key", "")
     request_id = request.args.get("request_id", "")
 
-    defn = DEFINITIONS.get(definition_id)
+    defn, api_key = get_api_key(definition_id)
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
     url = build_status_url(defn, request_id)
-    headers = {}
-    auth = defn.get("auth", {})
-    if auth.get("type") == "header":
-        prefix = auth.get("prefix", "")
-        headers[auth["header"]] = f"{prefix}{api_key}"
+    headers = build_auth_headers(defn, api_key)
 
     try:
         resp = http_requests.get(url, headers=headers, timeout=15)
@@ -311,19 +331,14 @@ def check_status():
 def get_result():
     """Fetch the final result of a completed async job."""
     definition_id = request.args.get("definition_id")
-    api_key = request.args.get("api_key", "")
     request_id = request.args.get("request_id", "")
 
-    defn = DEFINITIONS.get(definition_id)
+    defn, api_key = get_api_key(definition_id)
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
     url = build_result_url(defn, request_id)
-    headers = {}
-    auth = defn.get("auth", {})
-    if auth.get("type") == "header":
-        prefix = auth.get("prefix", "")
-        headers[auth["header"]] = f"{prefix}{api_key}"
+    headers = build_auth_headers(defn, api_key)
 
     try:
         resp = http_requests.get(url, headers=headers, timeout=30)
@@ -340,4 +355,4 @@ def get_result():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    app.run(host="0.0.0.0", port=8080, debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")

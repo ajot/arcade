@@ -13,7 +13,7 @@ REQUIRED_TOP_LEVEL = [
 VALID_PARAM_TYPES = {"string", "integer", "float", "enum"}
 VALID_UI_TYPES = {"textarea", "dropdown", "slider", "text"}
 VALID_PATTERNS = {"polling", "streaming", "sync"}
-VALID_OUTPUT_TYPES = {"text", "image", "audio"}
+VALID_OUTPUT_TYPES = {"text", "image", "audio", "video"}
 VALID_OUTPUT_SOURCES = {"inline", "url", "base64"}
 
 

@@ -364,7 +364,7 @@
     </button>
 
     <script>
-        const API_KEYS = {{ api_keys | tojson }};
+        const API_KEYS = new Set({{ api_keys | tojson }});
         const DEFINITIONS_LIST = {{ definitions | tojson }};
     </script>
     <script src="/static/app.js"></script>

@@ -17,30 +17,45 @@
     "timestamp": 1771654492098
   },
   {
-    "timestamp": 1771654556157,
-    "mode": "compare",
-    "selectedType": "image",
-    "play": null,
     "compare": {
       "left": {
         "definitionId": "together-image-generation",
         "model": "black-forest-labs/FLUX.1-schnell"
       },
+      "leftParams": {
+        "height": "1024",
+        "steps": "4",
+        "width": "1024"
+      },
       "right": {
         "definitionId": "do-image-generation",
         "model": "fal-ai/flux/schnell"
       },
+      "rightParams": {},
       "sharedParams": {
         "prompt": "A mountain landscape at sunset, oil painting style, vibrant colors"
       },
-      "leftParams": {
-        "steps": "4",
-        "width": "1024",
-        "height": "1024"
-      },
-      "rightParams": {},
       "systemPrompt": ""
     },
-    "name": "Comparing Image Models (DO + Together)"
+    "mode": "compare",
+    "name": "Comparing Image Models (DO + Together)",
+    "play": null,
+    "selectedType": "image",
+    "timestamp": 1771654556157
+  },
+  {
+    "timestamp": 1771656141263,
+    "mode": "play",
+    "selectedType": "audio",
+    "play": {
+      "definitionId": "do-music-generation",
+      "model": null,
+      "params": {
+        "prompt": "Upbeat synthwave track with retro 80s vibes, pulsing bass, and shimmering arpeggios"
+      },
+      "systemPrompt": ""
+    },
+    "compare": null,
+    "name": "DO - Music Generation"
   }
 ]

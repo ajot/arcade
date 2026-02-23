@@ -1,24 +1,9 @@
 // ---------------------------------------------------------------------------
-// Provider display names
+// Provider display names (derived from server-provided DEFINITIONS_LIST)
 // ---------------------------------------------------------------------------
 
-const PROVIDER_NAMES = {
-    baseten: 'Baseten',
-    cerebras: 'Cerebras',
-    deepinfra: 'DeepInfra',
-    deepseek: 'DeepSeek',
-    digitalocean: 'DigitalOcean',
-    fireworks: 'Fireworks',
-    google: 'Google',
-    groq: 'Groq',
-    huggingface: 'Hugging Face',
-    mistral: 'Mistral',
-    openai: 'OpenAI',
-    openrouter: 'OpenRouter',
-    perplexity: 'Perplexity',
-    sambanova: 'SambaNova',
-    together: 'Together AI',
-};
+// Populated in init() from DEFINITIONS_LIST entries
+let PROVIDER_NAMES = {};
 
 // ---------------------------------------------------------------------------
 // Type display names
@@ -42,7 +27,7 @@ function createSlot() {
     return {
         definition: null,
         polling: false,
-        lastSentRequest: null,
+        lastSentParams: null,
         lastResponse: null,
         abortController: null,
     };
@@ -63,32 +48,14 @@ function getCurrentDefinition() {
 // DOM helpers — map slot to containers
 // ---------------------------------------------------------------------------
 
-function getOutputContainer(slotId) {
-    if (slotId === 'play') return document.getElementById('renderedOutput');
-    if (slotId === 'left') return document.getElementById('compareLeftOutput');
-    if (slotId === 'right') return document.getElementById('compareRightOutput');
-    return null;
-}
+const SLOT_ELEMENTS = {
+    play:  { output: 'renderedOutput',      metrics: 'metricsRow',           json: 'jsonView',              error: 'errorDisplay' },
+    left:  { output: 'compareLeftOutput',    metrics: 'compareLeftMetrics',   json: 'compareLeftJsonView',   error: 'compareLeftError' },
+    right: { output: 'compareRightOutput',   metrics: 'compareRightMetrics',  json: 'compareRightJsonView',  error: 'compareRightError' },
+};
 
-function getMetricsContainer(slotId) {
-    if (slotId === 'play') return document.getElementById('metricsRow');
-    if (slotId === 'left') return document.getElementById('compareLeftMetrics');
-    if (slotId === 'right') return document.getElementById('compareRightMetrics');
-    return null;
-}
-
-function getJsonView(slotId) {
-    if (slotId === 'play') return document.getElementById('jsonView');
-    if (slotId === 'left') return document.getElementById('compareLeftJsonView');
-    if (slotId === 'right') return document.getElementById('compareRightJsonView');
-    return null;
-}
-
-function getErrorContainer(slotId) {
-    if (slotId === 'play') return document.getElementById('errorDisplay');
-    if (slotId === 'left') return document.getElementById('compareLeftError');
-    if (slotId === 'right') return document.getElementById('compareRightError');
-    return null;
+function getSlotElement(slotId, suffix) {
+    return document.getElementById(SLOT_ELEMENTS[slotId]?.[suffix]);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,11 +81,8 @@ function abortAllSlots() {
 // API key toggle
 // ---------------------------------------------------------------------------
 
-function getApiKey(provider) {
-    if (provider && typeof API_KEYS !== 'undefined' && API_KEYS[provider]) {
-        return API_KEYS[provider];
-    }
-    return null;
+function hasApiKey(provider) {
+    return provider && typeof API_KEYS !== 'undefined' && API_KEYS.has(provider);
 }
 
 function showApiKeyStatus(provider) {
@@ -128,7 +92,7 @@ function showApiKeyStatus(provider) {
         return;
     }
     const name = PROVIDER_NAMES[provider] || provider;
-    if (getApiKey(provider)) {
+    if (hasApiKey(provider)) {
         el.textContent = `${name} key loaded`;
         el.className = 'text-xs text-green-600';
     } else {
@@ -145,7 +109,7 @@ function showCompareKeyStatus(side, provider) {
         el.classList.add('hidden');
         return;
     }
-    if (getApiKey(provider)) {
+    if (hasApiKey(provider)) {
         el.textContent = 'key loaded';
         el.className = 'text-[10px] shrink-0 text-green-600';
     } else {
@@ -506,8 +470,7 @@ async function onGenerate() {
     const def = slots.play.definition;
     if (!def) return;
 
-    const apiKey = getApiKey(def.provider);
-    if (!apiKey) {
+    if (!hasApiKey(def.provider)) {
         showError(`API key missing for ${PROVIDER_NAMES[def.provider] || def.provider}. Add it to your .env file.`);
         return;
     }
@@ -531,7 +494,7 @@ async function onGenerate() {
     if (pattern === 'streaming') {
         log(`POST /api/stream (${def.name})`, 'request');
         log(`Params: ${JSON.stringify(params)}`, 'info');
-        startStreaming('play', apiKey, params);
+        startStreaming('play', params);
     } else {
         log(`POST /api/generate (${def.name})`, 'request');
         log(`Params: ${JSON.stringify(params)}`, 'info');
@@ -544,7 +507,6 @@ async function onGenerate() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     definition_id: def.id,
-                    api_key: apiKey,
                     params: params,
                 }),
                 signal: slots.play.abortController.signal,
@@ -552,7 +514,7 @@ async function onGenerate() {
 
             const data = await resp.json();
             const submitTime = performance.now() - syncStart;
-            slots.play.lastSentRequest = data.sent_request;
+            slots.play.lastSentParams = { definitionId: def.id, params };
 
             log(`Response: ${resp.status}`, resp.ok ? 'response' : 'error');
 
@@ -564,7 +526,8 @@ async function onGenerate() {
 
             if (pattern === 'polling' && data.request_id) {
                 log(`Job submitted in ${submitTime.toFixed(0)}ms. request_id: ${data.request_id}`, 'info');
-                startPolling('play', data.request_id, apiKey);
+                await pollLoop('play', data.request_id);
+                setGenerating(false);
             } else {
                 const syncMetrics = { totalTime: performance.now() - syncStart, submitTime };
                 slots.play.lastResponse = data.response;
@@ -573,7 +536,7 @@ async function onGenerate() {
                 } else {
                     renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}], 'play');
                 }
-                renderMetrics(syncMetrics, getMetricsContainer('play'));
+                renderMetrics(syncMetrics, getSlotElement('play', 'metrics'));
                 setGenerating(false);
             }
         } catch (e) {
@@ -589,10 +552,11 @@ async function onGenerate() {
 // Streaming — slot-aware
 // ---------------------------------------------------------------------------
 
-async function startStreaming(slotId, apiKey, params) {
+async function startStreaming(slotId, params) {
     const slot = slots[slotId];
     const def = slot.definition;
-    const container = getOutputContainer(slotId);
+    slot.lastSentParams = { definitionId: def.id, params };
+    const container = getSlotElement(slotId, 'output');
     container.innerHTML = '';
     const textBlock = document.createElement('pre');
     textBlock.className = 'text-sm text-gray-200 whitespace-pre-wrap leading-relaxed streaming-cursor';
@@ -612,7 +576,6 @@ async function startStreaming(slotId, apiKey, params) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 definition_id: def.id,
-                api_key: apiKey,
                 params: params,
             }),
             signal: slot.abortController.signal,
@@ -638,7 +601,6 @@ async function startStreaming(slotId, apiKey, params) {
             buffer = lines.pop();
 
             for (const line of lines) {
-                if (line.startsWith('event: request_info')) continue;
                 if (line.startsWith('event: error')) continue;
                 if (line.startsWith('event: done')) {
                     log(`[${slotId}] Stream complete.`, 'response');
@@ -660,9 +622,6 @@ async function startStreaming(slotId, apiKey, params) {
                         if (data.error) {
                             showSlotError(slotId, data.error);
                         }
-                        if (data.method) {
-                            slot.lastSentRequest = data;
-                        }
                     } catch (e) {
                         // Skip unparseable chunks
                     }
@@ -677,7 +636,7 @@ async function startStreaming(slotId, apiKey, params) {
 
         slot.lastResponse = { text: fullText };
         log(`[${slotId}] Streamed ${fullText.length} chars, ${metrics.tokenCount} tokens in ${(metrics.totalTime/1000).toFixed(2)}s`, 'response');
-        renderMetrics(metrics, getMetricsContainer(slotId));
+        renderMetrics(metrics, getSlotElement(slotId, 'metrics'));
 
     } catch (e) {
         if (e.name === 'AbortError') return;
@@ -690,29 +649,24 @@ async function startStreaming(slotId, apiKey, params) {
 }
 
 // ---------------------------------------------------------------------------
-// Polling — slot-aware
+// Polling — unified, promise-based
 // ---------------------------------------------------------------------------
 
-function startPolling(slotId, requestId, apiKey) {
+async function pollLoop(slotId, requestId) {
     const slot = slots[slotId];
     slot.polling = true;
     const def = slot.definition;
     const interval = def.interaction.poll_interval_ms || 2000;
     const metrics = { startTime: performance.now(), submitTime: null, pollCount: 0, totalTime: null };
     log(`[${slotId}] Polling every ${interval}ms...`, 'info');
-    pollLoop(slotId, requestId, apiKey, interval, metrics);
-}
 
-async function pollLoop(slotId, requestId, apiKey, interval, metrics) {
-    const slot = slots[slotId];
-    const def = slot.definition;
     let consecutiveErrors = 0;
     const MAX_POLL_ERRORS = 10;
 
     while (slot.polling) {
         try {
             metrics.pollCount++;
-            const url = `/api/status?definition_id=${def.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
+            const url = `/api/status?definition_id=${def.id}&request_id=${encodeURIComponent(requestId)}`;
             const resp = await fetch(url);
             const data = await resp.json();
             consecutiveErrors = 0;
@@ -722,10 +676,9 @@ async function pollLoop(slotId, requestId, apiKey, interval, metrics) {
             if (data.poll_status === 'done') {
                 metrics.totalTime = performance.now() - metrics.startTime;
                 log(`[${slotId}] Job complete. Fetching result...`, 'response');
-                await fetchResult(slotId, requestId, apiKey);
-                renderMetrics(metrics, getMetricsContainer(slotId));
+                await fetchResult(slotId, requestId);
+                renderMetrics(metrics, getSlotElement(slotId, 'metrics'));
                 slot.polling = false;
-                if (slotId === 'play') setGenerating(false);
                 return;
             }
 
@@ -733,7 +686,6 @@ async function pollLoop(slotId, requestId, apiKey, interval, metrics) {
                 log(`[${slotId}] Job failed.`, 'error');
                 showSlotError(slotId, 'Generation failed. Check the log for details.');
                 slot.polling = false;
-                if (slotId === 'play') setGenerating(false);
                 return;
             }
         } catch (e) {
@@ -742,7 +694,6 @@ async function pollLoop(slotId, requestId, apiKey, interval, metrics) {
             if (consecutiveErrors >= MAX_POLL_ERRORS) {
                 showSlotError(slotId, 'Polling failed after too many errors.');
                 slot.polling = false;
-                if (slotId === 'play') setGenerating(false);
                 return;
             }
         }
@@ -751,12 +702,12 @@ async function pollLoop(slotId, requestId, apiKey, interval, metrics) {
     }
 }
 
-async function fetchResult(slotId, requestId, apiKey) {
+async function fetchResult(slotId, requestId) {
     const slot = slots[slotId];
     const def = slot.definition;
 
     try {
-        const url = `/api/result?definition_id=${def.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
+        const url = `/api/result?definition_id=${def.id}&request_id=${encodeURIComponent(requestId)}`;
         const resp = await fetch(url);
         const data = await resp.json();
 
@@ -779,7 +730,7 @@ async function fetchResult(slotId, requestId, apiKey) {
 // ---------------------------------------------------------------------------
 
 function renderOutputs(outputs, slotId) {
-    const container = getOutputContainer(slotId);
+    const container = getSlotElement(slotId, 'output');
     container.innerHTML = '';
 
     for (const output of outputs) {
@@ -899,87 +850,27 @@ function createTextRenderer(text) {
 }
 
 function renderRawFallback(data, slotId) {
-    const container = getOutputContainer(slotId);
+    const container = getSlotElement(slotId, 'output');
     container.innerHTML = '';
     container.appendChild(createTextRenderer(JSON.stringify(data, null, 2)));
     if (slotId === 'play') showResults();
 }
 
 // ---------------------------------------------------------------------------
-// Curl builder — builds curl from definition + form params (no server call)
+// Curl preview — fetches curl from server-side /api/preview
 // ---------------------------------------------------------------------------
 
-function buildRequestPreview(definition, params) {
-    const req = definition.request;
-    const method = (req.method || 'POST').toUpperCase();
-    const url = req.url || '';
-
-    // Build headers
-    const headers = { 'Content-Type': req.content_type || 'application/json' };
-    const auth = definition.auth || {};
-    if (auth.type === 'header') {
-        const prefix = auth.prefix || '';
-        headers[auth.header] = `${prefix}<API_KEY>`;
-    }
-    for (const [k, v] of Object.entries(req.headers || {})) {
-        headers[k] = v;
-    }
-
-    // Build body
-    const body = JSON.parse(JSON.stringify(req.body_template || {}));
-    for (const paramDef of req.params || []) {
-        const name = paramDef.name;
-        if (!(name in params)) continue;
-        let value = params[name];
-
-        if (paramDef.type === 'integer') value = parseInt(value, 10);
-        else if (paramDef.type === 'float') value = parseFloat(value);
-
-        const bodyPath = paramDef.body_path;
-        if (bodyPath === '_chat_message') {
-            body.messages = [{ role: 'user', content: value }];
-        } else if (bodyPath) {
-            setNested(body, bodyPath, value);
-        } else {
-            body[name] = value;
-        }
-    }
-
-    // System prompt
-    const sysPrompt = params._system_prompt;
-    delete body._system_prompt;
-    if (body.messages && sysPrompt) {
-        body.messages.unshift({ role: 'system', content: sysPrompt });
-    }
-
-    return { method, url, headers, body };
+async function fetchCurlPreview(definitionId, params) {
+    const resp = await fetch('/api/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ definition_id: definitionId, params }),
+    });
+    const data = await resp.json();
+    return data.curl || '# Error generating curl preview';
 }
 
-function setNested(obj, path, value) {
-    const keys = path.split('.');
-    let current = obj;
-    for (let i = 0; i < keys.length - 1; i++) {
-        if (!(keys[i] in current)) current[keys[i]] = {};
-        current = current[keys[i]];
-    }
-    current[keys[keys.length - 1]] = value;
-}
-
-function formatCurl(preview) {
-    const parts = [`curl -X ${preview.method} '${preview.url}'`];
-
-    for (const [key, value] of Object.entries(preview.headers)) {
-        parts.push(`  -H '${key}: ${value}'`);
-    }
-
-    if (preview.body && Object.keys(preview.body).length > 0) {
-        parts.push(`  -d '${JSON.stringify(preview.body, null, 2)}'`);
-    }
-
-    return parts.join(' \\\n');
-}
-
-function openCurlModal() {
+async function openCurlModal() {
     const panel = document.getElementById('curlModalPanel');
     const playBody = document.getElementById('curlPlayBody');
     const compareBody = document.getElementById('curlCompareBody');
@@ -993,13 +884,26 @@ function openCurlModal() {
         const def = slots.play.definition;
         if (!def) return;
         const params = collectParams();
-        const preview = buildRequestPreview(def, params);
-        document.getElementById('curlPlayContent').textContent = formatCurl(preview);
+        document.getElementById('curlPlayContent').textContent = 'Loading...';
         playBody.classList.remove('hidden');
         playCopyBtn.classList.remove('hidden');
-        panel.style.maxWidth = '42rem'; // max-w-2xl
+        panel.style.maxWidth = '42rem';
+        document.getElementById('curlModal').classList.remove('hidden');
+        document.getElementById('curlPlayContent').textContent = await fetchCurlPreview(def.id, params);
     } else {
-        for (const [slotId, side] of [['left', 'Left'], ['right', 'Right']]) {
+        // Show modal immediately with loading state
+        for (const side of ['Left', 'Right']) {
+            document.getElementById(`curl${side}Content`).textContent = 'Loading...';
+            const copyBtn = document.getElementById(`curlCopyBtn${side}`);
+            if (copyBtn) copyBtn.textContent = 'Copy';
+        }
+        compareBody.classList.remove('hidden');
+        panel.style.maxWidth = '64rem';
+        document.getElementById('curlModal').classList.remove('hidden');
+
+        // Fetch both sides in parallel
+        const sides = [['left', 'Left'], ['right', 'Right']];
+        await Promise.all(sides.map(async ([slotId, side]) => {
             const def = slots[slotId].definition;
             const contentEl = document.getElementById(`curl${side}Content`);
             const labelEl = document.getElementById(`curl${side}Label`);
@@ -1008,23 +912,14 @@ function openCurlModal() {
                 if (labelEl) labelEl.textContent = side;
             } else {
                 const params = collectCompareParams(slotId);
-                const preview = buildRequestPreview(def, params);
-                contentEl.textContent = formatCurl(preview);
-                // Use provider + model label
+                contentEl.textContent = await fetchCurlPreview(def.id, params);
                 const provider = PROVIDER_NAMES[def.provider] || def.provider;
                 const modelPicker = document.getElementById(`compare${side}Model`);
                 const modelVal = modelPicker && !modelPicker.classList.contains('hidden') ? modelPicker.value : '';
                 if (labelEl) labelEl.textContent = modelVal ? `${provider} · ${modelVal}` : provider;
             }
-            // Reset copy button
-            const copyBtn = document.getElementById(`curlCopyBtn${side}`);
-            if (copyBtn) copyBtn.textContent = 'Copy';
-        }
-        compareBody.classList.remove('hidden');
-        panel.style.maxWidth = '64rem'; // wider for two columns
+        }));
     }
-
-    document.getElementById('curlModal').classList.remove('hidden');
 }
 
 function closeCurlModal() {
@@ -1126,14 +1021,23 @@ function switchResultTab(context, tab) {
     }
 }
 
-function populateJson(slotId) {
-    const view = getJsonView(slotId);
+async function populateJson(slotId) {
+    const view = getSlotElement(slotId, 'json');
     const slot = slots[slotId];
     if (!view) return;
 
     const reqEl = view.querySelector('.json-request');
     const resEl = view.querySelector('.json-response');
-    if (reqEl) reqEl.textContent = slot.lastSentRequest ? JSON.stringify(slot.lastSentRequest, null, 2) : '';
+
+    // Fetch request preview on demand from /api/preview
+    if (reqEl) {
+        if (slot.lastSentParams) {
+            reqEl.textContent = 'Loading...';
+            reqEl.textContent = await fetchCurlPreview(slot.lastSentParams.definitionId, slot.lastSentParams.params);
+        } else {
+            reqEl.textContent = '';
+        }
+    }
     if (resEl) resEl.textContent = slot.lastResponse ? JSON.stringify(slot.lastResponse, null, 2) : '';
 }
 
@@ -1221,7 +1125,7 @@ function showSlotError(slotId, msg) {
         showError(msg);
         return;
     }
-    const errEl = getErrorContainer(slotId);
+    const errEl = getSlotElement(slotId, 'error');
     if (errEl) {
         errEl.querySelector('.slot-error-msg').textContent = msg;
         errEl.classList.remove('hidden');
@@ -1379,8 +1283,10 @@ function filterByType() {
         providerPicker.appendChild(opt);
     }
 
-    // Keep provider selection if still valid
-    if (providers.includes(currentProvider)) {
+    // Auto-select if only one provider matches, otherwise keep selection if valid
+    if (providers.length === 1) {
+        providerPicker.value = providers[0];
+    } else if (providers.includes(currentProvider)) {
         providerPicker.value = currentProvider;
     } else {
         providerPicker.value = '';
@@ -1457,7 +1363,10 @@ function rebuildCompareProviders() {
             providerPicker.appendChild(opt);
         }
 
-        if (providers.includes(currentProvider)) {
+        // Auto-select if only one provider matches
+        if (providers.length === 1) {
+            providerPicker.value = providers[0];
+        } else if (providers.includes(currentProvider)) {
             providerPicker.value = currentProvider;
         } else {
             providerPicker.value = '';
@@ -1847,12 +1756,9 @@ async function onCompareGenerate() {
         return;
     }
 
-    const leftApiKey = getApiKey(leftDef.provider);
-    const rightApiKey = getApiKey(rightDef.provider);
-
     const missing = [];
-    if (!leftApiKey) missing.push(`Left (${PROVIDER_NAMES[leftDef.provider] || leftDef.provider})`);
-    if (!rightApiKey) missing.push(`Right (${PROVIDER_NAMES[rightDef.provider] || rightDef.provider})`);
+    if (!hasApiKey(leftDef.provider)) missing.push(`Left (${PROVIDER_NAMES[leftDef.provider] || leftDef.provider})`);
+    if (!hasApiKey(rightDef.provider)) missing.push(`Right (${PROVIDER_NAMES[rightDef.provider] || rightDef.provider})`);
     if (missing.length > 0) {
         showError(`API key missing for ${missing.join(' and ')}. Add to .env file.`);
         return;
@@ -1908,10 +1814,10 @@ async function onCompareGenerate() {
     // Show compare results, clear previous
     const compareResults = document.getElementById('compareResults');
     compareResults.classList.remove('hidden');
-    getOutputContainer('left').innerHTML = '';
-    getOutputContainer('right').innerHTML = '';
-    const leftMetrics = getMetricsContainer('left');
-    const rightMetrics = getMetricsContainer('right');
+    getSlotElement('left', 'output').innerHTML = '';
+    getSlotElement('right', 'output').innerHTML = '';
+    const leftMetrics = getSlotElement('left', 'metrics');
+    const rightMetrics = getSlotElement('right', 'metrics');
     if (leftMetrics) leftMetrics.innerHTML = '';
     if (rightMetrics) rightMetrics.innerHTML = '';
     resetResultTabs('compare');
@@ -1923,8 +1829,8 @@ async function onCompareGenerate() {
 
     // Execute both sides in parallel
     const results = await Promise.allSettled([
-        executeSlot('left', leftApiKey, leftParams),
-        executeSlot('right', rightApiKey, rightParams),
+        executeSlot('left', leftParams),
+        executeSlot('right', rightParams),
     ]);
 
     log('Compare generation complete.', 'info');
@@ -1940,14 +1846,14 @@ function collectSideParams(side, params) {
     }
 }
 
-async function executeSlot(slotId, apiKey, params) {
+async function executeSlot(slotId, params) {
     const slot = slots[slotId];
     const def = slot.definition;
     const pattern = def.interaction.pattern;
 
     if (pattern === 'streaming') {
         log(`[${slotId}] POST /api/stream (${def.name})`, 'request');
-        await startStreaming(slotId, apiKey, params);
+        await startStreaming(slotId, params);
     } else {
         log(`[${slotId}] POST /api/generate (${def.name})`, 'request');
         const syncStart = performance.now();
@@ -1959,7 +1865,6 @@ async function executeSlot(slotId, apiKey, params) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     definition_id: def.id,
-                    api_key: apiKey,
                     params: params,
                 }),
                 signal: slot.abortController.signal,
@@ -1967,7 +1872,7 @@ async function executeSlot(slotId, apiKey, params) {
 
             const data = await resp.json();
             const submitTime = performance.now() - syncStart;
-            slot.lastSentRequest = data.sent_request;
+            slot.lastSentParams = { definitionId: def.id, params };
 
             if (data.error) {
                 showSlotError(slotId, typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
@@ -1976,9 +1881,7 @@ async function executeSlot(slotId, apiKey, params) {
 
             if (pattern === 'polling' && data.request_id) {
                 log(`[${slotId}] Job submitted in ${submitTime.toFixed(0)}ms. request_id: ${data.request_id}`, 'info');
-                await new Promise((resolve) => {
-                    startPollingAsync(slotId, data.request_id, apiKey, resolve);
-                });
+                await pollLoop(slotId, data.request_id);
             } else {
                 const syncMetrics = { totalTime: performance.now() - syncStart, submitTime };
                 slot.lastResponse = data.response;
@@ -1987,67 +1890,13 @@ async function executeSlot(slotId, apiKey, params) {
                 } else {
                     renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}], slotId);
                 }
-                renderMetrics(syncMetrics, getMetricsContainer(slotId));
+                renderMetrics(syncMetrics, getSlotElement(slotId, 'metrics'));
             }
         } catch (e) {
             if (e.name === 'AbortError') return;
             showSlotError(slotId, e.message);
         }
     }
-}
-
-// Async polling that resolves when done (for compare mode Promise.allSettled)
-function startPollingAsync(slotId, requestId, apiKey, resolve) {
-    const slot = slots[slotId];
-    slot.polling = true;
-    const def = slot.definition;
-    const interval = def.interaction.poll_interval_ms || 2000;
-    const metrics = { startTime: performance.now(), submitTime: null, pollCount: 0, totalTime: null };
-    log(`[${slotId}] Polling every ${interval}ms...`, 'info');
-
-    (async function loop() {
-        let consecutiveErrors = 0;
-        const MAX_POLL_ERRORS = 10;
-
-        while (slot.polling) {
-            try {
-                metrics.pollCount++;
-                const url = `/api/status?definition_id=${def.id}&api_key=${encodeURIComponent(apiKey)}&request_id=${encodeURIComponent(requestId)}`;
-                const resp = await fetch(url);
-                const data = await resp.json();
-                consecutiveErrors = 0;
-
-                log(`[${slotId}] Status: ${data.poll_status} (poll #${metrics.pollCount})`, 'info');
-
-                if (data.poll_status === 'done') {
-                    metrics.totalTime = performance.now() - metrics.startTime;
-                    await fetchResult(slotId, requestId, apiKey);
-                    renderMetrics(metrics, getMetricsContainer(slotId));
-                    slot.polling = false;
-                    resolve();
-                    return;
-                }
-
-                if (data.poll_status === 'failed' || data.poll_status === 'error') {
-                    showSlotError(slotId, 'Generation failed.');
-                    slot.polling = false;
-                    resolve();
-                    return;
-                }
-            } catch (e) {
-                consecutiveErrors++;
-                log(`[${slotId}] Poll error: ${e.message}`, 'error');
-                if (consecutiveErrors >= MAX_POLL_ERRORS) {
-                    showSlotError(slotId, 'Polling failed after too many errors.');
-                    slot.polling = false;
-                    resolve();
-                    return;
-                }
-            }
-            await new Promise(r => setTimeout(r, interval));
-        }
-        resolve();
-    })();
 }
 
 // ---------------------------------------------------------------------------
@@ -2410,6 +2259,9 @@ document.addEventListener('click', (e) => {
 // Initialization
 // ---------------------------------------------------------------------------
 
+PROVIDER_NAMES = Object.fromEntries(
+    DEFINITIONS_LIST.map(d => [d.provider, d.provider_display_name])
+);
 initTypeFilter();
 initProviderPicker();
 initCompareProviderPickers();
