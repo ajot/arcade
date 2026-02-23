@@ -10,6 +10,12 @@ let PROVIDER_NAMES = {};
 // ---------------------------------------------------------------------------
 
 const TYPE_NAMES = { text: 'Text', image: 'Image', audio: 'Audio', video: 'Video' };
+const OUTPUT_TYPE_ICONS = {
+    text:  '<span class="palette-item-type-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>',
+    image: '<span class="palette-item-type-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>',
+    audio: '<span class="palette-item-type-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span>',
+    video: '<span class="palette-item-type-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>',
+};
 
 function typeName(type) {
     return TYPE_NAMES[type] || type.charAt(0).toUpperCase() + type.slice(1);
@@ -428,7 +434,8 @@ function renderPaletteList(query) {
                 const faviconHtml = providerUrl
                     ? '<img class="palette-item-icon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(providerUrl) + '&sz=16" alt="" width="16" height="16">'
                     : '';
-                left.innerHTML = faviconHtml
+                const typeIconHtml = OUTPUT_TYPE_ICONS[d.output_type] || '';
+                left.innerHTML = typeIconHtml + faviconHtml
                     + '<span class="palette-item-provider">' + escapeHtml(providerName) + '</span>'
                     + '<span class="palette-item-name">' + escapeHtml(displayName) + '</span>';
 
@@ -505,7 +512,9 @@ function renderPaletteModelList(query) {
 
         const left = document.createElement('span');
         left.className = 'palette-item-left';
-        left.innerHTML = '<span class="palette-item-name">' + escapeHtml(model) + '</span>';
+        const modelOutputType = (palettePendingDef.response?.outputs?.[0]?.type) || 'text';
+        const modelTypeIconHtml = OUTPUT_TYPE_ICONS[modelOutputType] || '';
+        left.innerHTML = modelTypeIconHtml + '<span class="palette-item-name">' + escapeHtml(model) + '</span>';
 
         const right = document.createElement('span');
         right.className = 'palette-item-model';
@@ -717,6 +726,8 @@ async function loadPlayEndpoint(defId) {
         playground.classList.add('hidden');
         slots.play.definition = null;
         updateEndpointLabel();
+        document.getElementById('welcomeState').classList.remove('hidden');
+        document.getElementById('playPickers').classList.add('hidden');
         return;
     }
 
@@ -727,6 +738,8 @@ async function loadPlayEndpoint(defId) {
         slots.play.definition = await resp.json();
         const def = slots.play.definition;
 
+        document.getElementById('welcomeState').classList.add('hidden');
+        document.getElementById('playPickers').classList.remove('hidden');
         populateModelPicker(def);
         showBaseUrl(def.request.url);
         renderForm(def);
@@ -823,29 +836,25 @@ function setMode(newMode) {
     const comparePickers = document.getElementById('comparePickers');
     const playResults = document.getElementById('results');
     const compareResults = document.getElementById('compareResults');
-    const modePlay = document.getElementById('modePlay');
-    const modeCompare = document.getElementById('modeCompare');
     const playground = document.getElementById('playground');
-
     const progressBar = document.getElementById('progressBar');
 
     if (mode === 'play') {
         mainCol.style.maxWidth = '720px';
         mainCol.style.paddingTop = '7.5rem';
         progressBar.style.top = '96px';
-        playPickers.classList.remove('hidden');
         comparePickers.classList.add('hidden');
         compareResults.classList.add('hidden');
         document.getElementById('compareSideParams').classList.add('hidden');
-        modePlay.classList.add('text-white', 'bg-gray-800/50');
-        modePlay.classList.remove('text-gray-600');
-        modeCompare.classList.remove('text-white', 'bg-gray-800/50');
-        modeCompare.classList.add('text-gray-600');
         // Restore play mode state
         if (slots.play.definition) {
             playground.classList.remove('hidden');
+            playPickers.classList.remove('hidden');
+            document.getElementById('welcomeState').classList.add('hidden');
         } else {
             playground.classList.add('hidden');
+            playPickers.classList.add('hidden');
+            document.getElementById('welcomeState').classList.remove('hidden');
         }
         // Restore system prompt for play definition
         hideSystemPromptGroup();
@@ -859,11 +868,13 @@ function setMode(newMode) {
         playPickers.classList.add('hidden');
         comparePickers.classList.remove('hidden');
         playResults.classList.add('hidden');
-        playground.classList.remove('hidden');
-        modeCompare.classList.add('text-white', 'bg-gray-800/50');
-        modeCompare.classList.remove('text-gray-600');
-        modePlay.classList.remove('text-white', 'bg-gray-800/50');
-        modePlay.classList.add('text-gray-600');
+        document.getElementById('welcomeState').classList.add('hidden');
+        // Only show playground if at least one endpoint is loaded
+        if (slots.left.definition || slots.right.definition) {
+            playground.classList.remove('hidden');
+        } else {
+            playground.classList.add('hidden');
+        }
         hideModelPicker();
         hideBaseUrl();
         updateCompareSystemPrompt();
@@ -1859,9 +1870,11 @@ function updateCompareForm() {
         document.getElementById('endpointName').textContent = def.name;
         document.getElementById('endpointDescription').textContent = def.description || '';
     } else {
-        document.getElementById('endpointName').textContent = 'Select endpoints to compare';
-        document.getElementById('endpointDescription').textContent = '';
+        // No endpoints selected — hide playground entirely
+        document.getElementById('playground').classList.add('hidden');
+        return;
     }
+    document.getElementById('playground').classList.remove('hidden');
     hideBaseUrl();
 
     // Compute shared params
@@ -2419,3 +2432,9 @@ PROVIDER_NAMES = Object.fromEntries(
 );
 loadBookmarks();
 validateKeys();
+
+// Populate welcome stats
+const endpointCount = DEFINITIONS_LIST.length;
+const providerCount = new Set(DEFINITIONS_LIST.map(d => d.provider)).size;
+const statsEl = document.getElementById('welcomeStats');
+if (statsEl) statsEl.textContent = `${endpointCount} endpoints \u00b7 ${providerCount} providers`;

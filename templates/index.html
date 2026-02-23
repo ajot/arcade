@@ -11,17 +11,9 @@
 
     <!-- Top bar -->
     <header id="topBar" class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
-        <!-- Row 1: Brand + mode + key status -->
+        <!-- Row 1: Brand + key status -->
         <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 h-14">
             <span class="text-sm font-semibold text-white tracking-tight mr-2">arcade</span>
-
-            <!-- Mode toggle -->
-            <div class="flex items-center border border-gray-800 rounded-md overflow-hidden mr-2 shrink-0">
-                <button id="modePlay" onclick="setMode('play')"
-                        class="px-3 py-1 text-xs text-white bg-gray-800/50 transition-colors whitespace-nowrap">Play</button>
-                <button id="modeCompare" onclick="setMode('compare')"
-                        class="px-3 py-1 text-xs text-gray-600 transition-colors whitespace-nowrap">Compare</button>
-            </div>
 
             <div class="ml-auto flex items-center gap-3">
                 <p id="apiKeyStatus" class="text-xs text-gray-600 hidden"></p>
@@ -29,7 +21,7 @@
         </div>
 
         <!-- Row 2: Play mode endpoint label + model picker -->
-        <div id="playPickers" class="border-t border-gray-800/50">
+        <div id="playPickers" class="hidden border-t border-gray-800/50">
             <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
                 <button id="endpointLabelBtn" onclick="openPalette()"
                         class="flex items-center gap-2 bg-transparent border border-gray-800 rounded-md px-3 py-1 text-sm text-gray-300 hover:border-gray-600 hover:text-white transition-colors">
@@ -84,6 +76,21 @@
 
     <!-- Main centered column -->
     <main id="mainColumn" class="mx-auto px-6 pb-24 transition-all duration-300" style="max-width: 720px; padding-top: 7.5rem;">
+
+        <!-- Welcome state (shown when no endpoint is loaded) -->
+        <div id="welcomeState" class="flex flex-col items-center justify-center text-center" style="min-height: calc(100vh - 10rem);">
+            <h1 class="text-4xl font-bold text-white tracking-tight mb-3">arcade</h1>
+            <p class="text-sm text-gray-500 mb-8">An AI playground for every provider</p>
+            <button onclick="openPalette()"
+                    class="flex items-center gap-3 bg-gray-900 border border-gray-700 hover:border-gray-500 rounded-lg px-5 py-3 text-sm text-gray-300 hover:text-white transition-colors shadow-lg">
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Select an endpoint...
+                <kbd class="ml-2 px-1.5 py-0.5 bg-gray-800 rounded text-[11px] text-gray-500">&#8984;K</kbd>
+            </button>
+            <p id="welcomeStats" class="mt-6 text-xs text-gray-600"></p>
+        </div>
 
         <!-- Endpoint info -->
         <div id="playground" class="hidden">

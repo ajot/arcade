@@ -1,3 +1,13 @@
+/* Welcome state fade-in */
+#welcomeState {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Progress bar animation */
 .animate-progress {
     animation: progress 1.5s ease-in-out infinite;
@@ -142,6 +152,17 @@ header select {
 #cmdPaletteList .palette-item .palette-item-left {
     display: flex;
     align-items: center;
+}
+
+#cmdPaletteList .palette-item .palette-item-type-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    color: #6b7280;
 }
 
 #cmdPaletteList .palette-item .palette-item-icon {
