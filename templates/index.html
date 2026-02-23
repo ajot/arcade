@@ -11,7 +11,7 @@
 
     <!-- Top bar -->
     <header id="topBar" class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
-        <!-- Row 1: Brand + mode + type pills + key status -->
+        <!-- Row 1: Brand + mode + key status -->
         <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 h-14">
             <span class="text-sm font-semibold text-white tracking-tight mr-2">arcade</span>
 
@@ -22,9 +22,6 @@
                 <button id="modeCompare" onclick="setMode('compare')"
                         class="px-3 py-1 text-xs text-gray-600 transition-colors whitespace-nowrap">Compare</button>
             </div>
-
-            <!-- Type filter pills -->
-            <div id="typeFilter" class="flex items-center gap-1"></div>
 
             <div class="ml-auto flex items-center gap-3">
                 <p id="apiKeyStatus" class="text-xs text-gray-600 hidden"></p>
@@ -348,6 +345,8 @@
                        class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
                        autocomplete="off" spellcheck="false">
             </div>
+            <!-- Breadcrumb (model step) -->
+            <div id="cmdPaletteBreadcrumb" class="hidden px-4 py-2 border-b border-gray-800/50"></div>
             <!-- Results list -->
             <div id="cmdPaletteList" class="overflow-y-auto flex-1"></div>
             <!-- Footer hints -->

@@ -139,6 +139,18 @@ header select {
     font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
 }
 
+#cmdPaletteList .palette-item .palette-item-left {
+    display: flex;
+    align-items: center;
+}
+
+#cmdPaletteList .palette-item .palette-item-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
 #cmdPaletteList .palette-item .palette-item-provider {
     font-size: 11px;
     color: #9ca3af;
@@ -149,4 +161,79 @@ header select {
     color: #eab308;
     margin-right: 6px;
     font-size: 12px;
+}
+
+#cmdPaletteList .palette-item.palette-item-disabled {
+    opacity: 0.4;
+}
+
+#cmdPaletteList .palette-item.palette-item-disabled .palette-item-model {
+    color: #f59e0b;
+    font-family: inherit;
+    font-size: 10px;
+}
+
+/* Breadcrumb back link */
+#cmdPaletteBreadcrumb .palette-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+#cmdPaletteBreadcrumb .palette-back-link:hover {
+    color: #e5e7eb;
+}
+
+/* Bookmark delete button */
+#cmdPaletteList .palette-item .palette-bookmark-delete {
+    display: none;
+    margin-left: 8px;
+    padding: 0 4px;
+    font-size: 14px;
+    color: #6b7280;
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 3px;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+#cmdPaletteList .palette-item:hover .palette-bookmark-delete,
+#cmdPaletteList .palette-item.palette-highlighted .palette-bookmark-delete {
+    display: inline-block;
+}
+
+#cmdPaletteList .palette-item .palette-bookmark-delete:hover {
+    color: #f87171;
+    background-color: rgba(248, 113, 113, 0.1);
+}
+
+/* Palette loading spinner */
+.palette-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #60a5fa;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+/* Inline bookmark save input */
+#cmdPaletteList .palette-bookmark-save-input {
+    background: transparent;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 13px;
+    color: #e5e7eb;
+    outline: none;
+    width: 100%;
+}
+
+#cmdPaletteList .palette-bookmark-save-input:focus {
+    border-color: #3b82f6;
 }

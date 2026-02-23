@@ -19,7 +19,6 @@ function typeName(type) {
 // State — slot-based model
 // ---------------------------------------------------------------------------
 
-let selectedType = ''; // '' means "All"
 let mode = 'play'; // 'play' | 'compare'
 let logEntryCount = 0;
 
@@ -28,6 +27,11 @@ let paletteOpen = false;
 let paletteHighlightIndex = 0;
 let paletteItems = []; // flat list of { type, id, ... } for keyboard nav
 let paletteTarget = null; // null = default, 'left' or 'right' for compare side targeting
+let paletteStep = 'endpoint'; // 'endpoint' | 'model'
+let palettePendingDefId = null; // Definition ID chosen in step 1
+let palettePendingDef = null; // Full definition object (fetched)
+let palettePendingIsCompare = false; // Whether Shift was held in step 1
+let paletteModelItems = []; // Model options for step 2
 
 function createSlot() {
     return {
@@ -84,11 +88,23 @@ function abortAllSlots() {
 }
 
 // ---------------------------------------------------------------------------
-// API key toggle
+// API key validation
 // ---------------------------------------------------------------------------
+
+const KEY_STATUS = {}; // provider -> 'valid' | 'invalid' | 'no_key' | 'unknown'
 
 function hasApiKey(provider) {
     return provider && typeof API_KEYS !== 'undefined' && API_KEYS.has(provider);
+}
+
+function keyStatusLabel(provider) {
+    const status = KEY_STATUS[provider];
+    if (status === 'valid') return { text: 'key valid', cls: 'text-green-600' };
+    if (status === 'invalid') return { text: 'key invalid', cls: 'text-red-500' };
+    if (status === 'no_key') return { text: 'key missing \u2014 add to .env', cls: 'text-amber-500' };
+    if (status === 'unknown' && hasApiKey(provider)) return { text: 'key loaded', cls: 'text-green-600' };
+    if (hasApiKey(provider)) return { text: 'key loaded', cls: 'text-green-600' };
+    return { text: 'key missing \u2014 add to .env', cls: 'text-amber-500' };
 }
 
 function showApiKeyStatus(provider) {
@@ -98,13 +114,9 @@ function showApiKeyStatus(provider) {
         return;
     }
     const name = PROVIDER_NAMES[provider] || provider;
-    if (hasApiKey(provider)) {
-        el.textContent = `${name} key loaded`;
-        el.className = 'text-xs text-green-600';
-    } else {
-        el.textContent = `${name} key missing \u2014 add to .env`;
-        el.className = 'text-xs text-amber-500';
-    }
+    const { text, cls } = keyStatusLabel(provider);
+    el.textContent = `${name} ${text}`;
+    el.className = `text-xs ${cls}`;
     el.classList.remove('hidden');
 }
 
@@ -115,14 +127,26 @@ function showCompareKeyStatus(side, provider) {
         el.classList.add('hidden');
         return;
     }
-    if (hasApiKey(provider)) {
-        el.textContent = 'key loaded';
-        el.className = 'text-[10px] shrink-0 text-green-600';
-    } else {
-        el.textContent = 'no key';
-        el.className = 'text-[10px] shrink-0 text-amber-500';
-    }
+    const { text, cls } = keyStatusLabel(provider);
+    el.textContent = text;
+    el.className = `text-[10px] shrink-0 ${cls}`;
     el.classList.remove('hidden');
+}
+
+function validateKeys() {
+    fetch('/api/validate-keys')
+        .then(r => r.json())
+        .then(data => {
+            Object.assign(KEY_STATUS, data);
+            // Re-render status for currently selected endpoints
+            const playDef = slots.play?.definition;
+            if (playDef) showApiKeyStatus(playDef.provider);
+            const leftDef = slots.left?.definition;
+            if (leftDef) showCompareKeyStatus('Left', leftDef.provider);
+            const rightDef = slots.right?.definition;
+            if (rightDef) showCompareKeyStatus('Right', rightDef.provider);
+        })
+        .catch(() => {}); // fail silently
 }
 
 // ---------------------------------------------------------------------------
@@ -198,33 +222,63 @@ function definitionUsesChat(definition) {
 // Command palette
 // ---------------------------------------------------------------------------
 
-function openPalette(target) {
+function openPalette(target, step) {
     paletteTarget = target || null;
     paletteOpen = true;
     paletteHighlightIndex = 0;
+    paletteStep = step || 'endpoint';
     const el = document.getElementById('cmdPalette');
     const input = document.getElementById('cmdPaletteInput');
     el.classList.remove('hidden');
     input.value = '';
     input.focus();
-    renderPaletteList('');
 
-    // Show compare hint only when there's an active endpoint to compare against
-    const hint = document.getElementById('cmdPaletteCompareHint');
-    const hasActive = mode === 'play' && slots.play.definition;
-    hint.classList.toggle('hidden', !hasActive);
+    if (paletteStep === 'model' && palettePendingDef) {
+        renderPaletteModelList('');
+        renderPaletteBreadcrumb();
+        updatePaletteFooter();
+    } else {
+        paletteStep = 'endpoint';
+        renderPaletteList('');
+        renderPaletteBreadcrumb();
+        updatePaletteFooter();
+    }
 }
 
 function closePalette() {
     paletteOpen = false;
     paletteTarget = null;
+    paletteStep = 'endpoint';
+    palettePendingDefId = null;
+    palettePendingDef = null;
+    palettePendingIsCompare = false;
+    paletteModelItems = [];
     document.getElementById('cmdPalette').classList.add('hidden');
     document.getElementById('cmdPaletteInput').value = '';
+    document.getElementById('cmdPaletteBreadcrumb').classList.add('hidden');
 }
 
 function togglePalette() {
-    if (paletteOpen) closePalette();
-    else openPalette();
+    if (paletteOpen) {
+        closePalette();
+        return;
+    }
+
+    // Context-aware: if in play mode with an endpoint loaded that has models, open directly to model step
+    if (mode === 'play' && slots.play.definition) {
+        const def = slots.play.definition;
+        const modelParam = def.request.params.find(p => p.name === 'model' && p.ui === 'dropdown');
+        if (modelParam && modelParam.options && modelParam.options.length > 0) {
+            palettePendingDefId = def.id;
+            palettePendingDef = def;
+            palettePendingIsCompare = false;
+            openPalette(null, 'model');
+            return;
+        }
+    }
+
+    // Default: open to endpoint step
+    openPalette();
 }
 
 function escapeHtml(str) {
@@ -269,8 +323,22 @@ function renderPaletteList(query) {
                 + '<span class="palette-item-name">' + escapeHtml(bm.name) + '</span>';
 
             const right = document.createElement('span');
-            right.className = 'palette-item-model';
-            right.textContent = generateBookmarkSubtitle(bm);
+            right.className = 'flex items-center';
+            const subtitle = document.createElement('span');
+            subtitle.className = 'palette-item-model';
+            subtitle.textContent = generateBookmarkSubtitle(bm);
+            right.appendChild(subtitle);
+
+            const bmIndex = bookmarks.indexOf(bm);
+            const delBtn = document.createElement('span');
+            delBtn.className = 'palette-bookmark-delete';
+            delBtn.textContent = '×';
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+                await deleteBookmark(bmIndex);
+                renderPaletteList(document.getElementById('cmdPaletteInput').value);
+            };
+            right.appendChild(delBtn);
 
             item.appendChild(left);
             item.appendChild(right);
@@ -278,11 +346,35 @@ function renderPaletteList(query) {
             item.onclick = (e) => selectPaletteItem(idx, e.shiftKey);
             list.appendChild(item);
 
-            paletteItems.push({ type: 'bookmark', index: bookmarks.indexOf(bm), bookmark: bm });
+            paletteItems.push({ type: 'bookmark', index: bmIndex, bookmark: bm });
         }
     }
 
-    // --- Endpoint sections grouped by output_type ---
+    // --- Save as bookmark row ---
+    const hasLoadedEndpoint = (mode === 'play' && slots.play.definition)
+        || (mode === 'compare' && (slots.left.definition || slots.right.definition));
+    if (hasLoadedEndpoint) {
+        const saveIdx = paletteItems.length;
+        const saveItem = document.createElement('div');
+        saveItem.className = 'palette-item' + (saveIdx === 0 ? ' palette-highlighted' : '');
+        saveItem.dataset.index = saveIdx;
+
+        const saveLeft = document.createElement('span');
+        saveLeft.innerHTML = '<span style="color:#6b7280;margin-right:6px;">+</span>'
+            + '<span class="palette-item-name" style="color:#9ca3af;">Save as bookmark...</span>';
+
+        saveItem.appendChild(saveLeft);
+        saveItem.onmouseenter = () => highlightPaletteItem(saveIdx);
+        saveItem.onclick = (e) => {
+            e.stopPropagation();
+            startInlineBookmarkSave(saveItem);
+        };
+        list.appendChild(saveItem);
+
+        paletteItems.push({ type: 'save-bookmark' });
+    }
+
+    // --- Endpoint sections grouped by output_type, validated first ---
     let filtered = getFilteredDefinitions();
     if (q) {
         filtered = filtered.filter(d => {
@@ -291,51 +383,77 @@ function renderPaletteList(query) {
         });
     }
 
-    const groups = {};
+    // Partition into validated (has key) and noKey
+    const validated = [];
+    const noKey = [];
     for (const d of filtered) {
-        const t = d.output_type || 'other';
-        if (!groups[t]) groups[t] = [];
-        groups[t].push(d);
+        const keyOk = KEY_STATUS[d.provider] === 'valid' || (hasApiKey(d.provider) && KEY_STATUS[d.provider] !== 'invalid');
+        if (keyOk) validated.push(d);
+        else noKey.push(d);
     }
 
     const typeOrder = ['text', 'image', 'audio', 'video', 'other'];
-    for (const t of typeOrder) {
-        if (!groups[t] || groups[t].length === 0) continue;
 
-        const header = document.createElement('div');
-        header.className = 'palette-group-header';
-        header.textContent = typeName(t);
-        list.appendChild(header);
+    function renderEndpointGroup(endpoints, isNoKey) {
+        const groups = {};
+        for (const d of endpoints) {
+            const t = d.output_type || 'other';
+            if (!groups[t]) groups[t] = [];
+            groups[t].push(d);
+        }
+        for (const t of typeOrder) {
+            if (!groups[t] || groups[t].length === 0) continue;
 
-        for (const d of groups[t]) {
-            const idx = paletteItems.length;
-            const item = document.createElement('div');
-            item.className = 'palette-item' + (idx === 0 ? ' palette-highlighted' : '');
-            item.dataset.index = idx;
+            const header = document.createElement('div');
+            header.className = 'palette-group-header';
+            header.textContent = typeName(t);
+            list.appendChild(header);
 
-            const left = document.createElement('span');
-            const providerName = PROVIDER_NAMES[d.provider] || d.provider;
-            // Strip provider prefix from name if present
-            let displayName = d.name;
-            if (displayName.startsWith(providerName + ' ')) {
-                displayName = displayName.slice(providerName.length + 1);
+            for (const d of groups[t]) {
+                const idx = paletteItems.length;
+                const item = document.createElement('div');
+                item.className = 'palette-item' + (idx === 0 ? ' palette-highlighted' : '');
+                item.dataset.index = idx;
+
+                if (isNoKey) item.classList.add('palette-item-disabled');
+
+                const left = document.createElement('span');
+                left.className = 'palette-item-left';
+                const providerName = PROVIDER_NAMES[d.provider] || d.provider;
+                let displayName = d.name;
+                if (displayName.startsWith(providerName + ' ')) {
+                    displayName = displayName.slice(providerName.length + 1);
+                }
+                const providerUrl = d.provider_url || '';
+                const faviconHtml = providerUrl
+                    ? '<img class="palette-item-icon" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(providerUrl) + '&sz=16" alt="" width="16" height="16">'
+                    : '';
+                left.innerHTML = faviconHtml
+                    + '<span class="palette-item-provider">' + escapeHtml(providerName) + '</span>'
+                    + '<span class="palette-item-name">' + escapeHtml(displayName) + '</span>';
+
+                const right = document.createElement('span');
+                right.className = 'palette-item-model';
+                if (isNoKey) {
+                    right.textContent = 'no key';
+                } else {
+                    const mc = d.model_count || 0;
+                    right.textContent = mc > 1 ? mc + ' models' : '1 model';
+                }
+
+                item.appendChild(left);
+                item.appendChild(right);
+                item.onmouseenter = () => highlightPaletteItem(idx);
+                item.onclick = (e) => selectPaletteItem(idx, e.shiftKey);
+                list.appendChild(item);
+
+                paletteItems.push({ type: 'endpoint', id: d.id, definition: d });
             }
-            left.innerHTML = '<span class="palette-item-provider">' + escapeHtml(providerName) + '</span>'
-                + '<span class="palette-item-name">' + escapeHtml(displayName) + '</span>';
-
-            const right = document.createElement('span');
-            right.className = 'palette-item-model';
-            right.textContent = '';
-
-            item.appendChild(left);
-            item.appendChild(right);
-            item.onmouseenter = () => highlightPaletteItem(idx);
-            item.onclick = (e) => selectPaletteItem(idx, e.shiftKey);
-            list.appendChild(item);
-
-            paletteItems.push({ type: 'endpoint', id: d.id, definition: d });
         }
     }
+
+    renderEndpointGroup(validated, false);
+    renderEndpointGroup(noKey, true);
 
     // If nothing matched
     if (paletteItems.length === 0) {
@@ -346,6 +464,113 @@ function renderPaletteList(query) {
     }
 
     paletteHighlightIndex = 0;
+}
+
+function renderPaletteModelList(query) {
+    const list = document.getElementById('cmdPaletteList');
+    list.innerHTML = '';
+    paletteItems = [];
+    const q = query.toLowerCase().trim();
+
+    if (!palettePendingDef) return;
+
+    const modelParam = palettePendingDef.request.params.find(p => p.name === 'model' && p.ui === 'dropdown');
+    if (!modelParam || !modelParam.options) return;
+
+    let options = [...modelParam.options];
+
+    // Filter by query
+    if (q) {
+        options = options.filter(m => m.toLowerCase().includes(q));
+    }
+
+    // Sort default model first
+    const defaultModel = modelParam.default;
+    options.sort((a, b) => {
+        if (a === defaultModel) return -1;
+        if (b === defaultModel) return 1;
+        return 0;
+    });
+
+    const header = document.createElement('div');
+    header.className = 'palette-group-header';
+    header.textContent = 'Models';
+    list.appendChild(header);
+
+    for (const model of options) {
+        const idx = paletteItems.length;
+        const item = document.createElement('div');
+        item.className = 'palette-item' + (idx === 0 ? ' palette-highlighted' : '');
+        item.dataset.index = idx;
+
+        const left = document.createElement('span');
+        left.className = 'palette-item-left';
+        left.innerHTML = '<span class="palette-item-name">' + escapeHtml(model) + '</span>';
+
+        const right = document.createElement('span');
+        right.className = 'palette-item-model';
+        right.textContent = model === defaultModel ? 'default' : '';
+
+        item.appendChild(left);
+        item.appendChild(right);
+        item.onmouseenter = () => highlightPaletteItem(idx);
+        item.onclick = () => selectPaletteModelItem(idx);
+        list.appendChild(item);
+
+        paletteItems.push({ type: 'model', value: model });
+    }
+
+    if (paletteItems.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'px-4 py-6 text-center text-xs text-gray-500';
+        empty.textContent = 'No matching models';
+        list.appendChild(empty);
+    }
+
+    paletteHighlightIndex = 0;
+}
+
+function renderPaletteLoading() {
+    const list = document.getElementById('cmdPaletteList');
+    list.innerHTML = '';
+    paletteItems = [];
+    const loading = document.createElement('div');
+    loading.className = 'px-4 py-6 text-center';
+    loading.innerHTML = '<span class="palette-spinner"></span>';
+    list.appendChild(loading);
+}
+
+function renderPaletteBreadcrumb() {
+    const el = document.getElementById('cmdPaletteBreadcrumb');
+    const input = document.getElementById('cmdPaletteInput');
+
+    if (paletteStep === 'model' && palettePendingDef) {
+        el.innerHTML = '';
+        const link = document.createElement('span');
+        link.className = 'palette-back-link';
+        link.innerHTML = '&larr; ' + escapeHtml(palettePendingDef.name);
+        link.onclick = () => paletteGoBack();
+        el.appendChild(link);
+        el.classList.remove('hidden');
+        input.placeholder = 'Search models...';
+    } else {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        input.placeholder = 'Search endpoints...';
+    }
+}
+
+function updatePaletteFooter() {
+    const footer = document.getElementById('cmdPaletteFooter');
+    if (paletteStep === 'model') {
+        footer.innerHTML = '<span><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">↵</kbd> Select model</span>'
+            + '<span><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">esc</kbd> Back</span>';
+    } else {
+        const hasActive = mode === 'play' && slots.play.definition;
+        footer.innerHTML = '<span><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">↵</kbd> Select</span>'
+            + '<span id="cmdPaletteCompareHint" class="' + (hasActive ? '' : 'hidden') + '"><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">⇧↵</kbd> Compare</span>'
+            + '<span><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">esc</kbd> Close</span>';
+    }
 }
 
 function highlightPaletteItem(idx) {
@@ -366,35 +591,113 @@ function highlightPaletteItem(idx) {
 async function selectPaletteItem(idx, isCompare) {
     if (idx < 0 || idx >= paletteItems.length) return;
     const item = paletteItems[idx];
-    closePalette();
 
     if (item.type === 'bookmark') {
+        closePalette();
         await restoreBookmark(item.bookmark);
         return;
     }
 
-    // item.type === 'endpoint'
-    const defId = item.id;
+    if (item.type === 'save-bookmark') {
+        // Activate inline save input
+        const list = document.getElementById('cmdPaletteList');
+        const rowEl = list.querySelector(`.palette-item[data-index="${idx}"]`);
+        if (rowEl) startInlineBookmarkSave(rowEl);
+        return;
+    }
 
+    // item.type === 'endpoint' — transition to model step
+    await transitionToModelStep(item.id, isCompare);
+}
+
+async function transitionToModelStep(defId, isCompare) {
+    palettePendingDefId = defId;
+    palettePendingIsCompare = isCompare;
+    renderPaletteLoading();
+
+    try {
+        const resp = await fetch(`/api/definitions/${defId}`);
+        palettePendingDef = await resp.json();
+    } catch (e) {
+        log(`Failed to load definition: ${e.message}`, 'error');
+        closePalette();
+        return;
+    }
+
+    const modelParam = palettePendingDef.request.params.find(p => p.name === 'model' && p.ui === 'dropdown');
+    if (!modelParam || !modelParam.options || modelParam.options.length === 0) {
+        closePalette();
+        await finalizeSelection(defId, null, isCompare);
+        return;
+    }
+
+    paletteStep = 'model';
+    const input = document.getElementById('cmdPaletteInput');
+    input.value = '';
+    renderPaletteModelList('');
+    renderPaletteBreadcrumb();
+    updatePaletteFooter();
+    input.focus();
+}
+
+async function finalizeSelection(defId, modelValue, isCompare) {
     if (isCompare && mode === 'play' && slots.play.definition) {
-        // Enter compare mode: current play → Left, new pick → Right
         const currentDefId = slots.play.definition.id;
         setMode('compare');
         await loadCompareEndpoint('Left', currentDefId);
         await loadCompareEndpoint('Right', defId);
+        if (modelValue) {
+            const rightPicker = document.getElementById('compareRightModel');
+            if (rightPicker) rightPicker.value = modelValue;
+        }
         return;
     }
 
     if (mode === 'compare') {
-        // In compare mode: determine which side to load
         const side = paletteTarget || 'right';
         const capSide = side.charAt(0).toUpperCase() + side.slice(1);
         await loadCompareEndpoint(capSide, defId);
+        if (modelValue) {
+            const picker = document.getElementById(`compare${capSide}Model`);
+            if (picker) picker.value = modelValue;
+        }
         return;
     }
 
-    // Default: play mode — load endpoint
     await loadPlayEndpoint(defId);
+    if (modelValue) {
+        const picker = document.getElementById('modelPicker');
+        if (picker) picker.value = modelValue;
+    }
+}
+
+function selectPaletteModelItem(idx) {
+    if (idx < 0 || idx >= paletteItems.length) return;
+    const item = paletteItems[idx];
+    if (item.type !== 'model') return;
+    const defId = palettePendingDefId;
+    const modelValue = item.value;
+    const isCompare = palettePendingIsCompare;
+    closePalette();
+    finalizeSelection(defId, modelValue, isCompare);
+}
+
+function paletteGoBack() {
+    if (paletteStep === 'model') {
+        paletteStep = 'endpoint';
+        palettePendingDefId = null;
+        palettePendingDef = null;
+        palettePendingIsCompare = false;
+        paletteModelItems = [];
+        const input = document.getElementById('cmdPaletteInput');
+        input.value = '';
+        renderPaletteList('');
+        renderPaletteBreadcrumb();
+        updatePaletteFooter();
+        input.focus();
+    } else {
+        closePalette();
+    }
 }
 
 async function loadPlayEndpoint(defId) {
@@ -1481,70 +1784,8 @@ function hideModelPicker() {
     document.getElementById('modelPicker').innerHTML = '';
 }
 
-// ---------------------------------------------------------------------------
-// Type filtering
-// ---------------------------------------------------------------------------
-
-function initTypeFilter() {
-    const types = [...new Set(DEFINITIONS_LIST.map(d => d.output_type).filter(Boolean))].sort();
-    const container = document.getElementById('typeFilter');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const allBtn = document.createElement('button');
-    allBtn.type = 'button';
-    allBtn.textContent = 'All';
-    allBtn.dataset.type = '';
-    allBtn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors bg-gray-800 text-white';
-    allBtn.onclick = () => onTypeChange('');
-    container.appendChild(allBtn);
-
-    for (const t of types) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = typeName(t);
-        btn.dataset.type = t;
-        btn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors text-gray-500 hover:text-gray-300';
-        btn.onclick = () => onTypeChange(t);
-        container.appendChild(btn);
-    }
-}
-
-function onTypeChange(type) {
-    selectedType = type;
-
-    const container = document.getElementById('typeFilter');
-    if (container) {
-        for (const btn of container.children) {
-            if (btn.dataset.type === type) {
-                btn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors bg-gray-800 text-white';
-            } else {
-                btn.className = 'px-2.5 py-0.5 text-xs rounded-full transition-colors text-gray-500 hover:text-gray-300';
-            }
-        }
-    }
-
-    filterByType();
-}
-
 function getFilteredDefinitions() {
-    return selectedType
-        ? DEFINITIONS_LIST.filter(d => d.output_type === selectedType)
-        : DEFINITIONS_LIST;
-}
-
-function filterByType() {
-    // Palette picks up the new filter via getFilteredDefinitions()
-    // If palette is open, re-render it
-    if (paletteOpen) {
-        const input = document.getElementById('cmdPaletteInput');
-        renderPaletteList(input ? input.value : '');
-    }
-}
-
-function getOutputTypeFromList(defId) {
-    const entry = DEFINITIONS_LIST.find(d => d.id === defId);
-    return entry ? entry.output_type : null;
+    return DEFINITIONS_LIST;
 }
 
 
@@ -1937,7 +2178,6 @@ function captureBookmarkState() {
     const state = {
         timestamp: Date.now(),
         mode: mode,
-        selectedType: selectedType,
         play: null,
         compare: null,
     };
@@ -2005,11 +2245,6 @@ async function restoreBookmark(bookmark) {
         // 1. Set mode
         if (bookmark.mode && bookmark.mode !== mode) {
             setMode(bookmark.mode);
-        }
-
-        // 2. Set type filter
-        if (bookmark.selectedType !== undefined) {
-            onTypeChange(bookmark.selectedType);
         }
 
         if (bookmark.mode === 'play' && bookmark.play) {
@@ -2103,12 +2338,43 @@ function generateBookmarkSubtitle(bookmark) {
     return bookmark.mode || '';
 }
 
+function startInlineBookmarkSave(rowEl) {
+    rowEl.innerHTML = '';
+    rowEl.onclick = null;
+    rowEl.onmouseenter = null;
+    rowEl.classList.remove('palette-highlighted');
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'palette-bookmark-save-input';
+    input.placeholder = 'Bookmark name...';
+    rowEl.appendChild(input);
+    input.focus();
+
+    // Prevent palette input from stealing keys
+    input.addEventListener('keydown', async (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter' && input.value.trim()) {
+            await addBookmark(input.value.trim());
+            renderPaletteList(document.getElementById('cmdPaletteInput').value);
+        } else if (e.key === 'Escape') {
+            renderPaletteList(document.getElementById('cmdPaletteInput').value);
+        }
+    });
+
+    input.addEventListener('input', (e) => e.stopPropagation());
+}
+
 // ---------------------------------------------------------------------------
 // Command palette — event listeners
 // ---------------------------------------------------------------------------
 
 document.getElementById('cmdPaletteInput').addEventListener('input', (e) => {
-    renderPaletteList(e.target.value);
+    if (paletteStep === 'model') {
+        renderPaletteModelList(e.target.value);
+    } else {
+        renderPaletteList(e.target.value);
+    }
 });
 
 document.getElementById('cmdPaletteInput').addEventListener('keydown', (e) => {
@@ -2124,9 +2390,13 @@ document.getElementById('cmdPaletteInput').addEventListener('keydown', (e) => {
         }
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        selectPaletteItem(paletteHighlightIndex, e.shiftKey);
+        if (paletteStep === 'model') {
+            selectPaletteModelItem(paletteHighlightIndex);
+        } else {
+            selectPaletteItem(paletteHighlightIndex, e.shiftKey);
+        }
     } else if (e.key === 'Escape') {
-        closePalette();
+        paletteGoBack();
     }
 });
 
@@ -2147,5 +2417,5 @@ document.addEventListener('keydown', (e) => {
 PROVIDER_NAMES = Object.fromEntries(
     DEFINITIONS_LIST.map(d => [d.provider, d.provider_display_name])
 );
-initTypeFilter();
 loadBookmarks();
+validateKeys();

@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests as http_requests
 from dotenv import load_dotenv
@@ -83,16 +84,22 @@ def provider_display_name(slug):
 @app.route("/")
 def index():
     """Render the main playground page."""
-    definitions_list = [
-        {
+    definitions_list = []
+    for d in DEFINITIONS.values():
+        model_param = next(
+            (p for p in d.get("request", {}).get("params", []) if p.get("name") == "model"),
+            None,
+        )
+        model_count = len(model_param.get("options", [])) if model_param else 0
+        definitions_list.append({
             "id": d["id"],
             "name": d["name"],
             "provider": d["provider"],
             "provider_display_name": provider_display_name(d["provider"]),
+            "provider_url": d.get("provider_url", ""),
             "output_type": d.get("response", {}).get("outputs", [{}])[0].get("type", "text"),
-        }
-        for d in DEFINITIONS.values()
-    ]
+            "model_count": model_count,
+        })
     definitions_list.sort(key=lambda d: d["name"])
     return render_template(
         "index.html",
@@ -340,6 +347,70 @@ def get_result():
 
     outputs = extract_outputs(defn, resp_data)
     return jsonify({"response": resp_data, "outputs": outputs})
+
+
+# ---------------------------------------------------------------------------
+# Routes — Key validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_provider(provider, api_key, auth_info):
+    """Validate a single provider's API key. Returns (provider, status)."""
+    validation_url = auth_info.get("validation_url")
+    if not validation_url:
+        return provider, "unknown"
+    headers = {
+        auth_info.get("header", "Authorization"): auth_info.get("prefix", "Bearer ") + api_key
+    }
+    try:
+        resp = http_requests.get(validation_url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            return provider, "valid"
+        elif resp.status_code in (401, 403):
+            return provider, "invalid"
+        else:
+            return provider, "unknown"
+    except http_requests.RequestException:
+        return provider, "unknown"
+
+
+@app.route("/api/validate-keys")
+def validate_keys():
+    """Validate all configured API keys by hitting each provider's validation_url."""
+    # Collect unique providers that have keys and validation URLs
+    to_validate = {}
+    for defn in DEFINITIONS.values():
+        provider = defn.get("provider", "")
+        if provider in to_validate or provider not in API_KEYS:
+            continue
+        auth = defn.get("auth", {})
+        if auth.get("validation_url"):
+            to_validate[provider] = auth
+
+    results = {}
+
+    # Mark providers with no key
+    all_providers = {d["provider"] for d in DEFINITIONS.values()}
+    for p in all_providers:
+        if p not in API_KEYS:
+            results[p] = "no_key"
+
+    # Validate in parallel
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        futures = {
+            pool.submit(_validate_provider, provider, API_KEYS[provider], auth): provider
+            for provider, auth in to_validate.items()
+        }
+        for future in as_completed(futures):
+            provider, status = future.result()
+            results[provider] = status
+
+    # Providers with keys but no validation_url
+    for p in API_KEYS:
+        if p not in results:
+            results[p] = "unknown"
+
+    return jsonify(results)
 
 
 # ---------------------------------------------------------------------------
