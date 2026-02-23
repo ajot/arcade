@@ -7,7 +7,8 @@
   "auth": {
     "type": "header",
     "header": "Authorization",
-    "prefix": "Bearer "
+    "prefix": "Bearer ",
+    "env_key": "TOGETHER_API_KEY"
   },
   "request": {
     "method": "POST",
@@ -54,25 +55,48 @@
   "examples": [
     {
       "label": "Welcome message",
-      "params": { "input": "Welcome to arcade, the universal AI playground. Pick any endpoint, and the UI builds itself.", "model": "canopylabs/orpheus-3b-0.1-ft", "voice": "tara" }
+      "params": {
+        "input": "Welcome to arcade, the universal AI playground. Pick any endpoint, and the UI builds itself.",
+        "model": "canopylabs/orpheus-3b-0.1-ft",
+        "voice": "tara"
+      }
     },
     {
       "label": "News anchor",
-      "params": { "input": "Breaking news tonight. Scientists have discovered a new species of deep-sea fish that communicates using bioluminescent patterns.", "model": "canopylabs/orpheus-3b-0.1-ft", "voice": "leo" }
+      "params": {
+        "input": "Breaking news tonight. Scientists have discovered a new species of deep-sea fish that communicates using bioluminescent patterns.",
+        "model": "canopylabs/orpheus-3b-0.1-ft",
+        "voice": "leo"
+      }
     },
     {
       "label": "Storyteller",
-      "params": { "input": "Once upon a time, in a land where code came alive at midnight, a small Python script dreamed of becoming a full application.", "model": "canopylabs/orpheus-3b-0.1-ft", "voice": "leah" }
+      "params": {
+        "input": "Once upon a time, in a land where code came alive at midnight, a small Python script dreamed of becoming a full application.",
+        "model": "canopylabs/orpheus-3b-0.1-ft",
+        "voice": "leah"
+      }
     },
     {
       "label": "Tech explainer",
-      "params": { "input": "Machine learning is a subset of artificial intelligence that enables systems to learn from data without being explicitly programmed.", "model": "canopylabs/orpheus-3b-0.1-ft", "voice": "jess" }
+      "params": {
+        "input": "Machine learning is a subset of artificial intelligence that enables systems to learn from data without being explicitly programmed.",
+        "model": "canopylabs/orpheus-3b-0.1-ft",
+        "voice": "jess"
+      }
     }
   ],
   "response": {
     "outputs": [
-      { "path": "$.audio_url", "type": "audio", "source": "url", "downloadable": true }
+      {
+        "path": "$.audio_url",
+        "type": "audio",
+        "source": "url",
+        "downloadable": true
+      }
     ],
-    "error": { "path": "$.error.message" }
+    "error": {
+      "path": "$.error.message"
+    }
   }
 }

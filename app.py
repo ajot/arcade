@@ -28,34 +28,6 @@ app = Flask(__name__)
 
 API_KEYS = {}
 
-
-def load_api_keys():
-    """Load provider API keys from environment variables."""
-    key_mappings = {
-        "digitalocean": "DIGITALOCEAN_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "together": "TOGETHER_API_KEY",
-        "groq": "GROQ_API_KEY",
-        "fireworks": "FIREWORKS_API_KEY",
-        "mistral": "MISTRAL_API_KEY",
-        "deepseek": "DEEPSEEK_API_KEY",
-        "perplexity": "PERPLEXITY_API_KEY",
-        "cerebras": "CEREBRAS_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-        "google": "GOOGLE_API_KEY",
-        "sambanova": "SAMBANOVA_API_KEY",
-        "deepinfra": "DEEPINFRA_API_KEY",
-        "baseten": "BASETEN_API_KEY",
-        "huggingface": "HUGGINGFACE_API_KEY",
-    }
-    for provider, env_var in key_mappings.items():
-        val = os.getenv(env_var, "")
-        if val:
-            API_KEYS[provider] = val
-
-
-load_api_keys()
-
 # ---------------------------------------------------------------------------
 # Definition loading
 # ---------------------------------------------------------------------------
@@ -64,7 +36,7 @@ DEFINITIONS = {}
 
 
 def load_definitions():
-    """Walk the definitions/ folder and load all JSON files."""
+    """Walk the definitions/ folder, load all JSON files, and collect API keys."""
     defs_dir = os.path.join(os.path.dirname(__file__), "definitions")
     for root, _dirs, files in os.walk(defs_dir):
         for fname in files:
@@ -74,6 +46,14 @@ def load_definitions():
             with open(path) as f:
                 defn = json.load(f)
             DEFINITIONS[defn["id"]] = defn
+
+            # Load API key from auth.env_key (if not already loaded for this provider)
+            provider = defn.get("provider", "")
+            env_key = defn.get("auth", {}).get("env_key", "")
+            if provider and env_key and provider not in API_KEYS:
+                val = os.getenv(env_key, "")
+                if val:
+                    API_KEYS[provider] = val
 
 
 load_definitions()

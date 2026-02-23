@@ -7,7 +7,8 @@
   "auth": {
     "type": "header",
     "header": "Authorization",
-    "prefix": "Bearer "
+    "prefix": "Bearer ",
+    "env_key": "DIGITALOCEAN_API_KEY"
   },
   "request": {
     "method": "POST",
@@ -43,23 +44,43 @@
     "result_url": "https://inference.do-ai.run/v1/async-invoke/{request_id}",
     "request_id_path": "$.request_id",
     "poll_interval_ms": 5000,
-    "done_when": { "path": "$.status", "equals": "COMPLETED" },
-    "failed_when": { "path": "$.status", "in": ["FAILED", "ERROR"] }
+    "done_when": {
+      "path": "$.status",
+      "equals": "COMPLETED"
+    },
+    "failed_when": {
+      "path": "$.status",
+      "in": [
+        "FAILED",
+        "ERROR"
+      ]
+    }
   },
   "examples": [
     {
       "label": "Synth wave",
-      "params": { "prompt": "Upbeat synthwave track with retro 80s vibes, pulsing bass, and shimmering arpeggios" }
+      "params": {
+        "prompt": "Upbeat synthwave track with retro 80s vibes, pulsing bass, and shimmering arpeggios"
+      }
     },
     {
       "label": "Jazz piano",
-      "params": { "prompt": "Smooth jazz piano trio, upright bass, brushed drums, late night club atmosphere" }
+      "params": {
+        "prompt": "Smooth jazz piano trio, upright bass, brushed drums, late night club atmosphere"
+      }
     }
   ],
   "response": {
     "outputs": [
-      { "path": "$..url", "type": "audio", "source": "url", "downloadable": true }
+      {
+        "path": "$..url",
+        "type": "audio",
+        "source": "url",
+        "downloadable": true
+      }
     ],
-    "error": { "path": "$.error.message" }
+    "error": {
+      "path": "$.error.message"
+    }
   }
 }

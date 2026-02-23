@@ -7,7 +7,8 @@
   "auth": {
     "type": "header",
     "header": "Authorization",
-    "prefix": "Bearer "
+    "prefix": "Bearer ",
+    "env_key": "TOGETHER_API_KEY"
   },
   "request": {
     "method": "POST",
@@ -93,25 +94,48 @@
   "examples": [
     {
       "label": "Space cat",
-      "params": { "prompt": "A cat astronaut floating in space, photorealistic, 8k, dramatic lighting", "model": "black-forest-labs/FLUX.1-schnell", "steps": 4 }
+      "params": {
+        "prompt": "A cat astronaut floating in space, photorealistic, 8k, dramatic lighting",
+        "model": "black-forest-labs/FLUX.1-schnell",
+        "steps": 4
+      }
     },
     {
       "label": "Mountain sunset",
-      "params": { "prompt": "A mountain landscape at sunset, oil painting style, vibrant colors", "model": "black-forest-labs/FLUX.1-schnell", "steps": 4 }
+      "params": {
+        "prompt": "A mountain landscape at sunset, oil painting style, vibrant colors",
+        "model": "black-forest-labs/FLUX.1-schnell",
+        "steps": 4
+      }
     },
     {
       "label": "Cyberpunk city",
-      "params": { "prompt": "A futuristic cyberpunk city at night, neon signs, rain-soaked streets, blade runner style", "model": "black-forest-labs/FLUX.1-schnell", "steps": 4 }
+      "params": {
+        "prompt": "A futuristic cyberpunk city at night, neon signs, rain-soaked streets, blade runner style",
+        "model": "black-forest-labs/FLUX.1-schnell",
+        "steps": 4
+      }
     },
     {
       "label": "Studio portrait",
-      "params": { "prompt": "Professional studio portrait of a golden retriever wearing reading glasses, soft lighting", "model": "black-forest-labs/FLUX.1-schnell", "steps": 4 }
+      "params": {
+        "prompt": "Professional studio portrait of a golden retriever wearing reading glasses, soft lighting",
+        "model": "black-forest-labs/FLUX.1-schnell",
+        "steps": 4
+      }
     }
   ],
   "response": {
     "outputs": [
-      { "path": "$.data[0].url", "type": "image", "source": "url", "downloadable": true }
+      {
+        "path": "$.data[0].url",
+        "type": "image",
+        "source": "url",
+        "downloadable": true
+      }
     ],
-    "error": { "path": "$.error.message" }
+    "error": {
+      "path": "$.error.message"
+    }
   }
 }

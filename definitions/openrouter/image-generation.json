@@ -7,7 +7,8 @@
   "auth": {
     "type": "header",
     "header": "Authorization",
-    "prefix": "Bearer "
+    "prefix": "Bearer ",
+    "env_key": "OPENROUTER_API_KEY"
   },
   "request": {
     "method": "POST",

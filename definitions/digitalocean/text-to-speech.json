@@ -7,7 +7,8 @@
   "auth": {
     "type": "header",
     "header": "Authorization",
-    "prefix": "Bearer "
+    "prefix": "Bearer ",
+    "env_key": "DIGITALOCEAN_API_KEY"
   },
   "request": {
     "method": "POST",
@@ -29,14 +30,47 @@
       {
         "name": "voice",
         "type": "enum",
-        "options": ["Rachel", "Aria", "Roger", "Sarah", "Laura", "Charlie", "George", "Callum", "River", "Liam", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill"],
+        "options": [
+          "Rachel",
+          "Aria",
+          "Roger",
+          "Sarah",
+          "Laura",
+          "Charlie",
+          "George",
+          "Callum",
+          "River",
+          "Liam",
+          "Charlotte",
+          "Alice",
+          "Matilda",
+          "Will",
+          "Jessica",
+          "Eric",
+          "Chris",
+          "Brian",
+          "Daniel",
+          "Lily",
+          "Bill"
+        ],
         "default": "Rachel",
         "ui": "dropdown"
       },
       {
         "name": "language",
         "type": "enum",
-        "options": ["en", "es", "fr", "de", "it", "pt", "pl", "hi", "ja", "zh"],
+        "options": [
+          "en",
+          "es",
+          "fr",
+          "de",
+          "it",
+          "pt",
+          "pl",
+          "hi",
+          "ja",
+          "zh"
+        ],
         "default": "en",
         "ui": "dropdown"
       }
@@ -48,23 +82,47 @@
     "result_url": "https://inference.do-ai.run/v1/async-invoke/{request_id}",
     "request_id_path": "$.request_id",
     "poll_interval_ms": 2000,
-    "done_when": { "path": "$.status", "equals": "COMPLETED" },
-    "failed_when": { "path": "$.status", "in": ["FAILED", "ERROR"] }
+    "done_when": {
+      "path": "$.status",
+      "equals": "COMPLETED"
+    },
+    "failed_when": {
+      "path": "$.status",
+      "in": [
+        "FAILED",
+        "ERROR"
+      ]
+    }
   },
   "examples": [
     {
       "label": "Welcome message",
-      "params": { "text": "Welcome to arcade, the universal AI playground. Pick any endpoint, and the UI builds itself.", "voice": "Rachel", "language": "en" }
+      "params": {
+        "text": "Welcome to arcade, the universal AI playground. Pick any endpoint, and the UI builds itself.",
+        "voice": "Rachel",
+        "language": "en"
+      }
     },
     {
       "label": "News anchor",
-      "params": { "text": "Breaking news tonight. Scientists have discovered a new species of deep-sea fish that communicates using bioluminescent patterns.", "voice": "Roger", "language": "en" }
+      "params": {
+        "text": "Breaking news tonight. Scientists have discovered a new species of deep-sea fish that communicates using bioluminescent patterns.",
+        "voice": "Roger",
+        "language": "en"
+      }
     }
   ],
   "response": {
     "outputs": [
-      { "path": "$..url", "type": "audio", "source": "url", "downloadable": true }
+      {
+        "path": "$..url",
+        "type": "audio",
+        "source": "url",
+        "downloadable": true
+      }
     ],
-    "error": { "path": "$.error.message" }
+    "error": {
+      "path": "$.error.message"
+    }
   }
 }

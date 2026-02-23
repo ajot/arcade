@@ -46,6 +46,8 @@ def validate_definition(path):
         errors.append("auth.type must be 'header'")
     if "header" not in auth:
         errors.append("auth.header is required")
+    if "env_key" not in auth:
+        errors.append("auth.env_key is required")
 
     req = defn.get("request", {})
     if "method" not in req:
