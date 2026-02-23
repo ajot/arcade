@@ -23,8 +23,14 @@
         "type": "enum",
         "options": [
           "llama-3.3-70b-versatile",
-          "mixtral-8x7b-32768",
-          "gemma2-9b-it"
+          "llama-3.1-8b-instant",
+          "openai/gpt-oss-120b",
+          "openai/gpt-oss-20b",
+          "meta-llama/llama-4-scout-17b-16e-instruct",
+          "qwen/qwen3-32b",
+          "moonshotai/kimi-k2-instruct-0905",
+          "groq/compound",
+          "groq/compound-mini"
         ],
         "default": "llama-3.3-70b-versatile",
         "ui": "dropdown",
