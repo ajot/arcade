@@ -84,13 +84,21 @@ def build_request(definition, params, api_key):
     return url, headers, body
 
 
+def _validate_request_id(request_id):
+    """Validate that request_id contains only safe characters."""
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', request_id):
+        raise ValueError(f"Invalid request_id: {request_id}")
+
+
 def build_status_url(definition, request_id):
     """Build the polling status URL by substituting {request_id}."""
+    _validate_request_id(request_id)
     return definition["interaction"]["status_url"].replace("{request_id}", request_id)
 
 
 def build_result_url(definition, request_id):
     """Build the result URL by substituting {request_id}."""
+    _validate_request_id(request_id)
     return definition["interaction"]["result_url"].replace("{request_id}", request_id)
 
 

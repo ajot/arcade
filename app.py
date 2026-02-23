@@ -314,7 +314,11 @@ def check_status():
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
-    url = build_status_url(defn, request_id)
+    try:
+        url = build_status_url(defn, request_id)
+    except ValueError:
+        return jsonify({"error": "Invalid request_id", "poll_status": "error"}), 400
+
     headers = build_auth_headers(defn, api_key)
 
     try:
@@ -337,7 +341,11 @@ def get_result():
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
-    url = build_result_url(defn, request_id)
+    try:
+        url = build_result_url(defn, request_id)
+    except ValueError:
+        return jsonify({"error": "Invalid request_id"}), 400
+
     headers = build_auth_headers(defn, api_key)
 
     try:
