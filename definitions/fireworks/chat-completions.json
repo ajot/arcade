@@ -8,7 +8,8 @@
     "type": "header",
     "header": "Authorization",
     "prefix": "Bearer ",
-    "env_key": "FIREWORKS_API_KEY"
+    "env_key": "FIREWORKS_API_KEY",
+    "validation_url": "https://api.fireworks.ai/inference/v1/models"
   },
   "request": {
     "method": "POST",

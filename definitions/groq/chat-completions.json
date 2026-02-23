@@ -8,7 +8,8 @@
     "type": "header",
     "header": "Authorization",
     "prefix": "Bearer ",
-    "env_key": "GROQ_API_KEY"
+    "env_key": "GROQ_API_KEY",
+    "validation_url": "https://api.groq.com/openai/v1/models"
   },
   "request": {
     "method": "POST",

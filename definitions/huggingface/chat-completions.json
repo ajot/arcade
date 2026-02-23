@@ -8,7 +8,8 @@
     "type": "header",
     "header": "Authorization",
     "prefix": "Bearer ",
-    "env_key": "HUGGINGFACE_API_KEY"
+    "env_key": "HUGGINGFACE_API_KEY",
+    "validation_url": "https://huggingface.co/api/whoami-v2"
   },
   "request": {
     "method": "POST",

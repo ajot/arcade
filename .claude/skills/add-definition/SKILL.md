@@ -35,6 +35,7 @@ Generate a new definition JSON file for an AI provider endpoint in this arcade p
    - `id` must be lowercase alphanumeric with hyphens (e.g., `myprovider-chat-completions`)
    - `auth.env_key` must declare the environment variable name (e.g., `MYPROVIDER_API_KEY`)
    - `auth.type` must be `"header"`
+   - `auth.validation_url` should be a free GET endpoint that requires auth (typically `GET <base_url>/models`). Used to verify API keys without cost. Omit only if the provider has no free validation endpoint (e.g., Perplexity)
    - At least one param must have `"required": true`
    - `examples` array must have at least one entry with `label` and `params` covering all required fields
    - Every output needs `path`, `type`, and `source`

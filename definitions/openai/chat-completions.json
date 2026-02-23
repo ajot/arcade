@@ -8,7 +8,8 @@
     "type": "header",
     "header": "Authorization",
     "prefix": "Bearer ",
-    "env_key": "OPENAI_API_KEY"
+    "env_key": "OPENAI_API_KEY",
+    "validation_url": "https://api.openai.com/v1/models"
   },
   "request": {
     "method": "POST",

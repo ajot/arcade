@@ -8,7 +8,8 @@
     "type": "header",
     "header": "Authorization",
     "prefix": "Bearer ",
-    "env_key": "DIGITALOCEAN_API_KEY"
+    "env_key": "DIGITALOCEAN_API_KEY",
+    "validation_url": "https://inference.do-ai.run/v1/models"
   },
   "request": {
     "method": "POST",

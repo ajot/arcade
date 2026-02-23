@@ -8,7 +8,8 @@
     "type": "header",
     "header": "Authorization",
     "prefix": "Bearer ",
-    "env_key": "TOGETHER_API_KEY"
+    "env_key": "TOGETHER_API_KEY",
+    "validation_url": "https://api.together.xyz/v1/models"
   },
   "request": {
     "method": "POST",

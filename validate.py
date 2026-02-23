@@ -48,6 +48,9 @@ def validate_definition(path):
         errors.append("auth.header is required")
     if "env_key" not in auth:
         errors.append("auth.env_key is required")
+    validation_url = auth.get("validation_url", "")
+    if validation_url and not validation_url.startswith("https://"):
+        errors.append("auth.validation_url must start with https://")
 
     req = defn.get("request", {})
     if "method" not in req:
