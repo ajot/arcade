@@ -27,38 +27,18 @@
             <div id="typeFilter" class="flex items-center gap-1"></div>
 
             <div class="ml-auto flex items-center gap-3">
-                <div class="relative">
-                    <button id="bookmarkBtn" onclick="toggleBookmarkDropdown()"
-                            class="text-gray-500 hover:text-gray-300 transition-colors text-xs flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
-                        </svg>
-                        Bookmarks
-                    </button>
-                    <div id="bookmarkDropdown" class="hidden absolute right-0 top-8 w-72 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 overflow-hidden">
-                        <div id="bookmarkList" class="max-h-64 overflow-y-auto"></div>
-                    </div>
-                </div>
                 <p id="apiKeyStatus" class="text-xs text-gray-600 hidden"></p>
             </div>
         </div>
 
-        <!-- Row 2: Play mode pickers -->
+        <!-- Row 2: Play mode endpoint label + model picker -->
         <div id="playPickers" class="border-t border-gray-800/50">
             <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
-                <select id="providerPicker" onchange="onProviderChange()"
-                        class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
-                    <option value="">All Providers</option>
-                </select>
-
-                <select id="definitionPicker" onchange="onDefinitionChange()"
-                        class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
-                    <option value="">Select endpoint...</option>
-                    {% for d in definitions %}
-                    <option value="{{ d.id }}">{{ d.name }}</option>
-                    {% endfor %}
-                </select>
+                <button id="endpointLabelBtn" onclick="openPalette()"
+                        class="flex items-center gap-2 bg-transparent border border-gray-800 rounded-md px-3 py-1 text-sm text-gray-300 hover:border-gray-600 hover:text-white transition-colors">
+                    <span id="endpointLabelText">Select an endpoint...</span>
+                    <span class="text-[10px] text-gray-600">⌘K</span>
+                </button>
 
                 <div id="modelPickerGroup" class="hidden">
                     <select id="modelPicker"
@@ -68,20 +48,16 @@
             </div>
         </div>
 
-        <!-- Row 2: Compare pickers (shown only in compare mode) -->
+        <!-- Row 2: Compare endpoint labels + model pickers -->
         <div id="comparePickers" class="hidden border-t border-gray-800/50">
             <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
                 <!-- Left side -->
                 <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="text-[10px] text-gray-500 uppercase font-medium shrink-0">Left</span>
-                    <select id="compareLeftProvider" onchange="onCompareProviderChange('Left')"
-                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
-                        <option value="">Provider</option>
-                    </select>
-                    <select id="compareLeftEndpoint" onchange="onCompareEndpointChange('Left')"
-                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
-                        <option value="">Endpoint</option>
-                    </select>
+                    <button id="compareLeftLabelBtn" onclick="openPalette('left')"
+                            class="flex items-center gap-1 bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 hover:border-gray-600 hover:text-white transition-colors truncate min-w-0">
+                        <span id="compareLeftLabelText" class="truncate">Select endpoint...</span>
+                    </button>
                     <select id="compareLeftModel"
                             class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
                     </select>
@@ -91,14 +67,10 @@
                 <!-- Right side -->
                 <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="text-[10px] text-gray-500 uppercase font-medium shrink-0">Right</span>
-                    <select id="compareRightProvider" onchange="onCompareProviderChange('Right')"
-                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
-                        <option value="">Provider</option>
-                    </select>
-                    <select id="compareRightEndpoint" onchange="onCompareEndpointChange('Right')"
-                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
-                        <option value="">Endpoint</option>
-                    </select>
+                    <button id="compareRightLabelBtn" onclick="openPalette('right')"
+                            class="flex items-center gap-1 bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 hover:border-gray-600 hover:text-white transition-colors truncate min-w-0">
+                        <span id="compareRightLabelText" class="truncate">Select endpoint...</span>
+                    </button>
                     <select id="compareRightModel"
                             class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
                     </select>
@@ -362,6 +334,30 @@
             class="fixed bottom-4 right-4 z-40 bg-gray-900 border border-gray-800 rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 hover:border-gray-700 transition-colors">
         Log <span id="logCount" class="ml-1 text-gray-600 hidden">0</span>
     </button>
+
+    <!-- Command palette -->
+    <div id="cmdPalette" class="hidden fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+        <div class="absolute inset-0 bg-black/60" id="cmdPaletteBackdrop"></div>
+        <div class="relative bg-gray-900 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4 flex flex-col overflow-hidden" style="max-height: 60vh;">
+            <!-- Search input -->
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
+                <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input id="cmdPaletteInput" type="text" placeholder="Search endpoints..."
+                       class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+                       autocomplete="off" spellcheck="false">
+            </div>
+            <!-- Results list -->
+            <div id="cmdPaletteList" class="overflow-y-auto flex-1"></div>
+            <!-- Footer hints -->
+            <div id="cmdPaletteFooter" class="px-4 py-2 border-t border-gray-800 flex items-center gap-4 text-[11px] text-gray-500">
+                <span><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">↵</kbd> Select</span>
+                <span id="cmdPaletteCompareHint" class="hidden"><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">⇧↵</kbd> Compare</span>
+                <span><kbd class="px-1 py-0.5 bg-gray-800 rounded text-[10px]">esc</kbd> Close</span>
+            </div>
+        </div>
+    </div>
 
     <script>
         const API_KEYS = new Set({{ api_keys | tojson }});

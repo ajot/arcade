@@ -23,6 +23,12 @@ let selectedType = ''; // '' means "All"
 let mode = 'play'; // 'play' | 'compare'
 let logEntryCount = 0;
 
+// Command palette state
+let paletteOpen = false;
+let paletteHighlightIndex = 0;
+let paletteItems = []; // flat list of { type, id, ... } for keyboard nav
+let paletteTarget = null; // null = default, 'left' or 'right' for compare side targeting
+
 function createSlot() {
     return {
         definition: null,
@@ -189,6 +195,318 @@ function definitionUsesChat(definition) {
 }
 
 // ---------------------------------------------------------------------------
+// Command palette
+// ---------------------------------------------------------------------------
+
+function openPalette(target) {
+    paletteTarget = target || null;
+    paletteOpen = true;
+    paletteHighlightIndex = 0;
+    const el = document.getElementById('cmdPalette');
+    const input = document.getElementById('cmdPaletteInput');
+    el.classList.remove('hidden');
+    input.value = '';
+    input.focus();
+    renderPaletteList('');
+
+    // Show compare hint only when there's an active endpoint to compare against
+    const hint = document.getElementById('cmdPaletteCompareHint');
+    const hasActive = mode === 'play' && slots.play.definition;
+    hint.classList.toggle('hidden', !hasActive);
+}
+
+function closePalette() {
+    paletteOpen = false;
+    paletteTarget = null;
+    document.getElementById('cmdPalette').classList.add('hidden');
+    document.getElementById('cmdPaletteInput').value = '';
+}
+
+function togglePalette() {
+    if (paletteOpen) closePalette();
+    else openPalette();
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function renderPaletteList(query) {
+    const list = document.getElementById('cmdPaletteList');
+    list.innerHTML = '';
+    paletteItems = [];
+    const q = query.toLowerCase().trim();
+
+    // --- Bookmarks section ---
+    const filteredBookmarks = bookmarks.filter(bm => {
+        if (!q) return true;
+        const searchStr = [
+            bm.name,
+            bm.play?.definitionId,
+            bm.compare?.left?.definitionId,
+            bm.compare?.right?.definitionId,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return searchStr.includes(q);
+    });
+
+    if (filteredBookmarks.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'palette-group-header';
+        header.textContent = 'Bookmarks';
+        list.appendChild(header);
+
+        for (let i = 0; i < filteredBookmarks.length; i++) {
+            const bm = filteredBookmarks[i];
+            const idx = paletteItems.length;
+            const item = document.createElement('div');
+            item.className = 'palette-item' + (idx === 0 ? ' palette-highlighted' : '');
+            item.dataset.index = idx;
+
+            const left = document.createElement('span');
+            left.innerHTML = '<span class="palette-bookmark-star">★</span>'
+                + '<span class="palette-item-name">' + escapeHtml(bm.name) + '</span>';
+
+            const right = document.createElement('span');
+            right.className = 'palette-item-model';
+            right.textContent = generateBookmarkSubtitle(bm);
+
+            item.appendChild(left);
+            item.appendChild(right);
+            item.onmouseenter = () => highlightPaletteItem(idx);
+            item.onclick = (e) => selectPaletteItem(idx, e.shiftKey);
+            list.appendChild(item);
+
+            paletteItems.push({ type: 'bookmark', index: bookmarks.indexOf(bm), bookmark: bm });
+        }
+    }
+
+    // --- Endpoint sections grouped by output_type ---
+    let filtered = getFilteredDefinitions();
+    if (q) {
+        filtered = filtered.filter(d => {
+            const searchStr = [d.name, d.provider, PROVIDER_NAMES[d.provider] || '', d.output_type || ''].join(' ').toLowerCase();
+            return searchStr.includes(q);
+        });
+    }
+
+    const groups = {};
+    for (const d of filtered) {
+        const t = d.output_type || 'other';
+        if (!groups[t]) groups[t] = [];
+        groups[t].push(d);
+    }
+
+    const typeOrder = ['text', 'image', 'audio', 'video', 'other'];
+    for (const t of typeOrder) {
+        if (!groups[t] || groups[t].length === 0) continue;
+
+        const header = document.createElement('div');
+        header.className = 'palette-group-header';
+        header.textContent = typeName(t);
+        list.appendChild(header);
+
+        for (const d of groups[t]) {
+            const idx = paletteItems.length;
+            const item = document.createElement('div');
+            item.className = 'palette-item' + (idx === 0 ? ' palette-highlighted' : '');
+            item.dataset.index = idx;
+
+            const left = document.createElement('span');
+            const providerName = PROVIDER_NAMES[d.provider] || d.provider;
+            // Strip provider prefix from name if present
+            let displayName = d.name;
+            if (displayName.startsWith(providerName + ' ')) {
+                displayName = displayName.slice(providerName.length + 1);
+            }
+            left.innerHTML = '<span class="palette-item-provider">' + escapeHtml(providerName) + '</span>'
+                + '<span class="palette-item-name">' + escapeHtml(displayName) + '</span>';
+
+            const right = document.createElement('span');
+            right.className = 'palette-item-model';
+            right.textContent = '';
+
+            item.appendChild(left);
+            item.appendChild(right);
+            item.onmouseenter = () => highlightPaletteItem(idx);
+            item.onclick = (e) => selectPaletteItem(idx, e.shiftKey);
+            list.appendChild(item);
+
+            paletteItems.push({ type: 'endpoint', id: d.id, definition: d });
+        }
+    }
+
+    // If nothing matched
+    if (paletteItems.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'px-4 py-6 text-center text-xs text-gray-500';
+        empty.textContent = 'No matching endpoints';
+        list.appendChild(empty);
+    }
+
+    paletteHighlightIndex = 0;
+}
+
+function highlightPaletteItem(idx) {
+    const list = document.getElementById('cmdPaletteList');
+    const prev = list.querySelector('.palette-highlighted');
+    if (prev) prev.classList.remove('palette-highlighted');
+    paletteHighlightIndex = idx;
+    const items = list.querySelectorAll('.palette-item');
+    for (const item of items) {
+        if (parseInt(item.dataset.index) === idx) {
+            item.classList.add('palette-highlighted');
+            item.scrollIntoView({ block: 'nearest' });
+            break;
+        }
+    }
+}
+
+async function selectPaletteItem(idx, isCompare) {
+    if (idx < 0 || idx >= paletteItems.length) return;
+    const item = paletteItems[idx];
+    closePalette();
+
+    if (item.type === 'bookmark') {
+        await restoreBookmark(item.bookmark);
+        return;
+    }
+
+    // item.type === 'endpoint'
+    const defId = item.id;
+
+    if (isCompare && mode === 'play' && slots.play.definition) {
+        // Enter compare mode: current play → Left, new pick → Right
+        const currentDefId = slots.play.definition.id;
+        setMode('compare');
+        await loadCompareEndpoint('Left', currentDefId);
+        await loadCompareEndpoint('Right', defId);
+        return;
+    }
+
+    if (mode === 'compare') {
+        // In compare mode: determine which side to load
+        const side = paletteTarget || 'right';
+        const capSide = side.charAt(0).toUpperCase() + side.slice(1);
+        await loadCompareEndpoint(capSide, defId);
+        return;
+    }
+
+    // Default: play mode — load endpoint
+    await loadPlayEndpoint(defId);
+}
+
+async function loadPlayEndpoint(defId) {
+    const playground = document.getElementById('playground');
+    const results = document.getElementById('results');
+    const errorDisplay = document.getElementById('errorDisplay');
+
+    results.classList.add('hidden');
+    errorDisplay.classList.add('hidden');
+    abortSlot('play');
+    hideModelPicker();
+    hideBaseUrl();
+    hideSystemPromptGroup();
+    showApiKeyStatus(null);
+
+    if (!defId) {
+        playground.classList.add('hidden');
+        slots.play.definition = null;
+        updateEndpointLabel();
+        return;
+    }
+
+    log(`Loading definition: ${defId}`, 'info');
+
+    try {
+        const resp = await fetch(`/api/definitions/${defId}`);
+        slots.play.definition = await resp.json();
+        const def = slots.play.definition;
+
+        populateModelPicker(def);
+        showBaseUrl(def.request.url);
+        renderForm(def);
+        playground.classList.remove('hidden');
+
+        if (definitionUsesChat(def)) {
+            showSystemPromptGroup();
+        }
+
+        showApiKeyStatus(def.provider);
+        updateEndpointLabel();
+        log(`Loaded: ${def.name}`, 'info');
+    } catch (e) {
+        log(`Failed to load definition: ${e.message}`, 'error');
+    }
+}
+
+async function loadCompareEndpoint(side, defId) {
+    const slotId = side.toLowerCase();
+    const modelPicker = document.getElementById(`compare${side}Model`);
+    modelPicker.innerHTML = '';
+    modelPicker.classList.add('hidden');
+
+    if (!defId) {
+        slots[slotId].definition = null;
+        updateCompareEndpointLabel(side);
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/definitions/${defId}`);
+        const def = await resp.json();
+        slots[slotId].definition = def;
+
+        // Populate model picker
+        const modelParam = def.request.params.find(p => p.name === 'model' && p.ui === 'dropdown');
+        if (modelParam && modelParam.options && modelParam.options.length > 0) {
+            for (const opt of modelParam.options) {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                if (opt === modelParam.default) option.selected = true;
+                modelPicker.appendChild(option);
+            }
+            modelPicker.classList.remove('hidden');
+        }
+
+        showCompareKeyStatus(side, def.provider);
+        log(`[${slotId}] Loaded: ${def.name}`, 'info');
+    } catch (e) {
+        log(`[${slotId}] Failed to load definition: ${e.message}`, 'error');
+    }
+
+    updateCompareEndpointLabel(side);
+    checkCompareCompatibility();
+    updateCompareSystemPrompt();
+    updateCompareForm();
+}
+
+function updateEndpointLabel() {
+    const label = document.getElementById('endpointLabelText');
+    if (!label) return;
+    const def = slots.play.definition;
+    if (def) {
+        label.textContent = def.name;
+    } else {
+        label.textContent = 'Select an endpoint...';
+    }
+}
+
+function updateCompareEndpointLabel(side) {
+    const label = document.getElementById(`compare${side}LabelText`);
+    if (!label) return;
+    const slotId = side.toLowerCase();
+    const def = slots[slotId].definition;
+    if (def) {
+        label.textContent = def.name;
+    } else {
+        label.textContent = 'Select endpoint...';
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Mode switching
 // ---------------------------------------------------------------------------
 
@@ -256,54 +574,6 @@ function setMode(newMode) {
 // ---------------------------------------------------------------------------
 // Definition switching (Play mode)
 // ---------------------------------------------------------------------------
-
-async function onDefinitionChange() {
-    const picker = document.getElementById('definitionPicker');
-    const id = picker.value;
-    const playground = document.getElementById('playground');
-    const results = document.getElementById('results');
-    const errorDisplay = document.getElementById('errorDisplay');
-
-    // Reset
-    results.classList.add('hidden');
-    errorDisplay.classList.add('hidden');
-    abortSlot('play');
-    hideModelPicker();
-    hideBaseUrl();
-    hideSystemPromptGroup();
-    showApiKeyStatus(null);
-
-    if (!id) {
-        playground.classList.add('hidden');
-        slots.play.definition = null;
-        return;
-    }
-
-    log(`Loading definition: ${id}`, 'info');
-
-    try {
-        const resp = await fetch(`/api/definitions/${id}`);
-        slots.play.definition = await resp.json();
-        const def = slots.play.definition;
-
-        populateModelPicker(def);
-        showBaseUrl(def.request.url);
-
-        renderForm(def);
-        playground.classList.remove('hidden');
-
-        if (definitionUsesChat(def)) {
-            showSystemPromptGroup();
-        }
-
-        // Show API key status
-        showApiKeyStatus(def.provider);
-
-        log(`Loaded: ${def.name}`, 'info');
-    } catch (e) {
-        log(`Failed to load definition: ${e.message}`, 'error');
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Dynamic form rendering
@@ -1264,298 +1534,17 @@ function getFilteredDefinitions() {
 }
 
 function filterByType() {
-    const filtered = getFilteredDefinitions();
-
-    // --- Play mode: rebuild provider dropdown ---
-    const providerPicker = document.getElementById('providerPicker');
-    const currentProvider = providerPicker.value;
-    const providers = [...new Set(filtered.map(d => d.provider))].sort();
-
-    providerPicker.innerHTML = '';
-    const allOpt = document.createElement('option');
-    allOpt.value = '';
-    allOpt.textContent = 'All Providers';
-    providerPicker.appendChild(allOpt);
-    for (const slug of providers) {
-        const opt = document.createElement('option');
-        opt.value = slug;
-        opt.textContent = PROVIDER_NAMES[slug] || slug;
-        providerPicker.appendChild(opt);
+    // Palette picks up the new filter via getFilteredDefinitions()
+    // If palette is open, re-render it
+    if (paletteOpen) {
+        const input = document.getElementById('cmdPaletteInput');
+        renderPaletteList(input ? input.value : '');
     }
-
-    // Auto-select if only one provider matches, otherwise keep selection if valid
-    if (providers.length === 1) {
-        providerPicker.value = providers[0];
-    } else if (providers.includes(currentProvider)) {
-        providerPicker.value = currentProvider;
-    } else {
-        providerPicker.value = '';
-    }
-
-    // Rebuild endpoint dropdown respecting both type + provider
-    rebuildEndpointPicker();
-
-    // --- Compare mode: rebuild both sides ---
-    rebuildCompareProviders();
-}
-
-function rebuildEndpointPicker() {
-    const providerSlug = document.getElementById('providerPicker').value;
-    const picker = document.getElementById('definitionPicker');
-    const currentValue = picker.value;
-
-    let filtered = getFilteredDefinitions();
-    if (providerSlug) {
-        filtered = filtered.filter(d => d.provider === providerSlug);
-    }
-
-    picker.innerHTML = '';
-
-    if (filtered.length === 1) {
-        const opt = document.createElement('option');
-        opt.value = filtered[0].id;
-        opt.textContent = filtered[0].name;
-        picker.appendChild(opt);
-        picker.value = filtered[0].id;
-        if (currentValue !== filtered[0].id) {
-            onDefinitionChange();
-        }
-    } else {
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'Select an endpoint...';
-        picker.appendChild(placeholder);
-        for (const d of filtered) {
-            const opt = document.createElement('option');
-            opt.value = d.id;
-            opt.textContent = d.name;
-            picker.appendChild(opt);
-        }
-        // Restore selection if still valid
-        if (filtered.some(d => d.id === currentValue)) {
-            picker.value = currentValue;
-        } else {
-            picker.value = '';
-            if (mode === 'play') {
-                document.getElementById('playground').classList.add('hidden');
-            }
-            hideModelPicker();
-            hideBaseUrl();
-            slots.play.definition = null;
-        }
-    }
-}
-
-function rebuildCompareProviders() {
-    const filtered = getFilteredDefinitions();
-    const providers = [...new Set(filtered.map(d => d.provider))].sort();
-
-    for (const side of ['Left', 'Right']) {
-        const providerPicker = document.getElementById(`compare${side}Provider`);
-        if (!providerPicker) continue;
-        const currentProvider = providerPicker.value;
-
-        providerPicker.innerHTML = '<option value="">Provider</option>';
-        for (const slug of providers) {
-            const opt = document.createElement('option');
-            opt.value = slug;
-            opt.textContent = PROVIDER_NAMES[slug] || slug;
-            providerPicker.appendChild(opt);
-        }
-
-        // Auto-select if only one provider matches
-        if (providers.length === 1) {
-            providerPicker.value = providers[0];
-        } else if (providers.includes(currentProvider)) {
-            providerPicker.value = currentProvider;
-        } else {
-            providerPicker.value = '';
-        }
-
-        // Rebuild endpoint dropdown for this side
-        rebuildCompareEndpointPicker(side);
-    }
-}
-
-function rebuildCompareEndpointPicker(side) {
-    const providerSlug = document.getElementById(`compare${side}Provider`).value;
-    const endpointPicker = document.getElementById(`compare${side}Endpoint`);
-    const currentValue = endpointPicker.value;
-    const slotId = side.toLowerCase();
-
-    const otherSide = side === 'Left' ? 'right' : 'left';
-    const otherDef = slots[otherSide].definition;
-    const otherType = otherDef ? getOutputTypeFromList(otherDef.id) : null;
-
-    let filtered = getFilteredDefinitions();
-    if (providerSlug) {
-        filtered = filtered.filter(d => d.provider === providerSlug);
-    }
-    if (otherType) {
-        filtered = filtered.filter(d => d.output_type === otherType);
-    }
-
-    endpointPicker.innerHTML = '<option value="">Endpoint</option>';
-    for (const d of filtered) {
-        const opt = document.createElement('option');
-        opt.value = d.id;
-        opt.textContent = d.name;
-        endpointPicker.appendChild(opt);
-    }
-
-    if (filtered.some(d => d.id === currentValue)) {
-        endpointPicker.value = currentValue;
-    } else {
-        endpointPicker.value = '';
-        slots[slotId].definition = null;
-        const modelPicker = document.getElementById(`compare${side}Model`);
-        modelPicker.innerHTML = '';
-        modelPicker.classList.add('hidden');
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Provider filtering (Play mode)
-// ---------------------------------------------------------------------------
-
-function onProviderChange() {
-    rebuildEndpointPicker();
-}
-
-function initProviderPicker() {
-    const providerPicker = document.getElementById('providerPicker');
-    const providers = [...new Set(DEFINITIONS_LIST.map(d => d.provider))].sort();
-
-    for (const slug of providers) {
-        const opt = document.createElement('option');
-        opt.value = slug;
-        opt.textContent = PROVIDER_NAMES[slug] || slug;
-        providerPicker.appendChild(opt);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Compare mode — picker handlers
-// ---------------------------------------------------------------------------
-
-function initCompareProviderPickers() {
-    for (const side of ['Left', 'Right']) {
-        const picker = document.getElementById(`compare${side}Provider`);
-        if (!picker) continue;
-        picker.innerHTML = '<option value="">Provider</option>';
-        const providers = [...new Set(DEFINITIONS_LIST.map(d => d.provider))].sort();
-        for (const slug of providers) {
-            const opt = document.createElement('option');
-            opt.value = slug;
-            opt.textContent = PROVIDER_NAMES[slug] || slug;
-            picker.appendChild(opt);
-        }
-    }
-}
-
-function onCompareProviderChange(side) {
-    const providerSlug = document.getElementById(`compare${side}Provider`).value;
-    const modelPicker = document.getElementById(`compare${side}Model`);
-    modelPicker.innerHTML = '';
-    modelPicker.classList.add('hidden');
-
-    const slotId = side.toLowerCase();
-    slots[slotId].definition = null;
-
-    rebuildCompareEndpointPicker(side);
-    showCompareKeyStatus(side, providerSlug);
-    checkCompareCompatibility();
 }
 
 function getOutputTypeFromList(defId) {
     const entry = DEFINITIONS_LIST.find(d => d.id === defId);
     return entry ? entry.output_type : null;
-}
-
-function filterOtherSideEndpoints(changedSide) {
-    const otherSide = changedSide === 'Left' ? 'Right' : 'Left';
-    const changedSlot = slots[changedSide.toLowerCase()];
-    const otherEndpointPicker = document.getElementById(`compare${otherSide}Endpoint`);
-    const otherProviderSlug = document.getElementById(`compare${otherSide}Provider`).value;
-
-    // Preserve current selection
-    const currentValue = otherEndpointPicker.value;
-
-    // Determine the output type to filter by
-    const filterType = changedSlot.definition
-        ? getOutputTypeFromList(changedSlot.definition.id)
-        : null;
-
-    // Start from type-filtered list
-    let candidates = getFilteredDefinitions();
-    if (otherProviderSlug) {
-        candidates = candidates.filter(d => d.provider === otherProviderSlug);
-    }
-
-    // Filter to compatible output types
-    if (filterType) {
-        candidates = candidates.filter(d => d.output_type === filterType);
-    }
-
-    otherEndpointPicker.innerHTML = '<option value="">Endpoint</option>';
-    for (const d of candidates) {
-        const opt = document.createElement('option');
-        opt.value = d.id;
-        opt.textContent = d.name;
-        otherEndpointPicker.appendChild(opt);
-    }
-
-    // Restore selection if it's still in the filtered list
-    if (candidates.some(d => d.id === currentValue)) {
-        otherEndpointPicker.value = currentValue;
-    }
-}
-
-async function onCompareEndpointChange(side) {
-    const endpointPicker = document.getElementById(`compare${side}Endpoint`);
-    const modelPicker = document.getElementById(`compare${side}Model`);
-    const defId = endpointPicker.value;
-    const slotId = side.toLowerCase();
-
-    modelPicker.innerHTML = '';
-    modelPicker.classList.add('hidden');
-
-    if (!defId) {
-        slots[slotId].definition = null;
-        filterOtherSideEndpoints(side);
-        checkCompareCompatibility();
-        return;
-    }
-
-    try {
-        const resp = await fetch(`/api/definitions/${defId}`);
-        const def = await resp.json();
-        slots[slotId].definition = def;
-
-        // Populate model picker
-        const modelParam = def.request.params.find(p => p.name === 'model' && p.ui === 'dropdown');
-        if (modelParam && modelParam.options && modelParam.options.length > 0) {
-            for (const opt of modelParam.options) {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.textContent = opt;
-                if (opt === modelParam.default) option.selected = true;
-                modelPicker.appendChild(option);
-            }
-            modelPicker.classList.remove('hidden');
-        }
-
-        // Filter other side's endpoints to compatible types
-        filterOtherSideEndpoints(side);
-        showCompareKeyStatus(side, def.provider);
-        log(`[${slotId}] Loaded: ${def.name}`, 'info');
-    } catch (e) {
-        log(`[${slotId}] Failed to load definition: ${e.message}`, 'error');
-    }
-
-    checkCompareCompatibility();
-    updateCompareSystemPrompt();
-    updateCompareForm();
 }
 
 
@@ -1954,21 +1943,18 @@ function captureBookmarkState() {
     };
 
     if (mode === 'play') {
-        const defPicker = document.getElementById('definitionPicker');
         const modelPicker = document.getElementById('modelPicker');
         const modelGroup = document.getElementById('modelPickerGroup');
         const formContainer = document.getElementById('formFields');
         const sysPrompt = document.getElementById('systemPromptInput');
 
         state.play = {
-            definitionId: defPicker.value || null,
+            definitionId: slots.play.definition ? slots.play.definition.id : null,
             model: (!modelGroup.classList.contains('hidden') && modelPicker.value) ? modelPicker.value : null,
             params: collectFormParams(formContainer),
             systemPrompt: sysPrompt ? sysPrompt.value : '',
         };
     } else {
-        const leftEndpoint = document.getElementById('compareLeftEndpoint');
-        const rightEndpoint = document.getElementById('compareRightEndpoint');
         const leftModel = document.getElementById('compareLeftModel');
         const rightModel = document.getElementById('compareRightModel');
         const sharedContainer = document.getElementById('formFields');
@@ -1978,11 +1964,11 @@ function captureBookmarkState() {
 
         state.compare = {
             left: {
-                definitionId: leftEndpoint.value || null,
+                definitionId: slots.left.definition ? slots.left.definition.id : null,
                 model: (!leftModel.classList.contains('hidden') && leftModel.value) ? leftModel.value : null,
             },
             right: {
-                definitionId: rightEndpoint.value || null,
+                definitionId: slots.right.definition ? slots.right.definition.id : null,
                 model: (!rightModel.classList.contains('hidden') && rightModel.value) ? rightModel.value : null,
             },
             sharedParams: collectFormParams(sharedContainer),
@@ -2030,22 +2016,7 @@ async function restoreBookmark(bookmark) {
             const bp = bookmark.play;
             if (!bp.definitionId) return;
 
-            // Look up provider from DEFINITIONS_LIST
-            const defEntry = DEFINITIONS_LIST.find(d => d.id === bp.definitionId);
-            if (!defEntry) {
-                log('Bookmark error: definition not found — ' + bp.definitionId, 'error');
-                return;
-            }
-
-            // Set provider
-            const providerPicker = document.getElementById('providerPicker');
-            providerPicker.value = defEntry.provider;
-            onProviderChange();
-
-            // Set endpoint
-            const defPicker = document.getElementById('definitionPicker');
-            defPicker.value = bp.definitionId;
-            await onDefinitionChange();
+            await loadPlayEndpoint(bp.definitionId);
 
             // Set model
             if (bp.model) {
@@ -2060,7 +2031,6 @@ async function restoreBookmark(bookmark) {
             if (bp.systemPrompt) {
                 const sysInput = document.getElementById('systemPromptInput');
                 sysInput.value = bp.systemPrompt;
-                // Expand it if it has content
                 sysInput.classList.remove('hidden');
                 document.getElementById('systemPromptArrow').innerHTML = '&#9660;';
             }
@@ -2073,21 +2043,7 @@ async function restoreBookmark(bookmark) {
                 const sideData = bc[sideKey];
                 if (!sideData || !sideData.definitionId) continue;
 
-                const defEntry = DEFINITIONS_LIST.find(d => d.id === sideData.definitionId);
-                if (!defEntry) {
-                    log('Bookmark error: definition not found — ' + sideData.definitionId, 'error');
-                    continue;
-                }
-
-                // Set provider
-                const providerPicker = document.getElementById(`compare${side}Provider`);
-                providerPicker.value = defEntry.provider;
-                onCompareProviderChange(side);
-
-                // Set endpoint
-                const endpointPicker = document.getElementById(`compare${side}Endpoint`);
-                endpointPicker.value = sideData.definitionId;
-                await onCompareEndpointChange(side);
+                await loadCompareEndpoint(side, sideData.definitionId);
 
                 // Set model
                 if (sideData.model) {
@@ -2123,22 +2079,11 @@ async function addBookmark(name) {
     state.name = name;
     bookmarks.push(state);
     await saveBookmarksToServer(bookmarks);
-    renderBookmarkDropdown();
 }
 
 async function deleteBookmark(index) {
     bookmarks.splice(index, 1);
     await saveBookmarksToServer(bookmarks);
-    renderBookmarkDropdown();
-}
-
-function toggleBookmarkDropdown() {
-    const dropdown = document.getElementById('bookmarkDropdown');
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-        renderBookmarkDropdown();
-    }
-    dropdown.classList.toggle('hidden');
 }
 
 function generateBookmarkSubtitle(bookmark) {
@@ -2158,100 +2103,40 @@ function generateBookmarkSubtitle(bookmark) {
     return bookmark.mode || '';
 }
 
-function renderBookmarkDropdown() {
-    const list = document.getElementById('bookmarkList');
-    list.innerHTML = '';
+// ---------------------------------------------------------------------------
+// Command palette — event listeners
+// ---------------------------------------------------------------------------
 
-    // "Save current" row
-    const saveRow = document.createElement('div');
-    saveRow.className = 'px-3 py-2 border-b border-gray-800';
+document.getElementById('cmdPaletteInput').addEventListener('input', (e) => {
+    renderPaletteList(e.target.value);
+});
 
-    const hasEndpoint = mode === 'play'
-        ? !!document.getElementById('definitionPicker').value
-        : !!(document.getElementById('compareLeftEndpoint').value || document.getElementById('compareRightEndpoint').value);
-
-    const saveBtn = document.createElement('button');
-    saveBtn.className = hasEndpoint
-        ? 'text-xs text-blue-400 hover:text-blue-300 transition-colors w-full text-left'
-        : 'text-xs text-gray-600 cursor-not-allowed w-full text-left';
-    saveBtn.textContent = '+ Save current';
-    saveBtn.disabled = !hasEndpoint;
-
-    saveBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (!hasEndpoint) return;
-        // Replace the save button with an inline input
-        saveRow.innerHTML = '';
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.placeholder = 'Bookmark name...';
-        input.className = 'w-full bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500';
-        input.onkeydown = async (e) => {
-            if (e.key === 'Enter' && input.value.trim()) {
-                await addBookmark(input.value.trim());
-            }
-            if (e.key === 'Escape') {
-                renderBookmarkDropdown();
-            }
-        };
-        saveRow.appendChild(input);
-        setTimeout(() => input.focus(), 0);
-    };
-
-    saveRow.appendChild(saveBtn);
-    list.appendChild(saveRow);
-
-    // Bookmark entries
-    if (bookmarks.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'px-3 py-3 text-xs text-gray-600 text-center';
-        empty.textContent = 'No bookmarks yet';
-        list.appendChild(empty);
-    } else {
-        for (let i = 0; i < bookmarks.length; i++) {
-            const bm = bookmarks[i];
-            const row = document.createElement('div');
-            row.className = 'flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 cursor-pointer group';
-
-            const info = document.createElement('div');
-            info.className = 'flex-1 min-w-0';
-            info.onclick = async () => {
-                document.getElementById('bookmarkDropdown').classList.add('hidden');
-                await restoreBookmark(bm);
-            };
-
-            const nameEl = document.createElement('div');
-            nameEl.className = 'text-xs text-gray-200 font-medium truncate';
-            nameEl.textContent = bm.name;
-
-            const subtitle = document.createElement('div');
-            subtitle.className = 'text-[10px] text-gray-500 truncate';
-            subtitle.textContent = generateBookmarkSubtitle(bm);
-
-            info.appendChild(nameEl);
-            info.appendChild(subtitle);
-            row.appendChild(info);
-
-            const delBtn = document.createElement('button');
-            delBtn.className = 'text-gray-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity shrink-0';
-            delBtn.textContent = '\u00d7';
-            delBtn.onclick = async (e) => {
-                e.stopPropagation();
-                await deleteBookmark(i);
-            };
-            row.appendChild(delBtn);
-
-            list.appendChild(row);
+document.getElementById('cmdPaletteInput').addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (paletteHighlightIndex < paletteItems.length - 1) {
+            highlightPaletteItem(paletteHighlightIndex + 1);
         }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (paletteHighlightIndex > 0) {
+            highlightPaletteItem(paletteHighlightIndex - 1);
+        }
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectPaletteItem(paletteHighlightIndex, e.shiftKey);
+    } else if (e.key === 'Escape') {
+        closePalette();
     }
-}
+});
 
-// Close bookmark dropdown on outside click
-document.addEventListener('click', (e) => {
-    const dropdown = document.getElementById('bookmarkDropdown');
-    const btn = document.getElementById('bookmarkBtn');
-    if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
-        dropdown.classList.add('hidden');
+document.getElementById('cmdPaletteBackdrop').addEventListener('click', closePalette);
+
+// Global Cmd+K / Ctrl+K
+document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        togglePalette();
     }
 });
 
@@ -2263,6 +2148,4 @@ PROVIDER_NAMES = Object.fromEntries(
     DEFINITIONS_LIST.map(d => [d.provider, d.provider_display_name])
 );
 initTypeFilter();
-initProviderPicker();
-initCompareProviderPickers();
 loadBookmarks();

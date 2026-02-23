@@ -103,3 +103,50 @@ header select {
         grid-template-columns: 1fr !important;
     }
 }
+
+/* Command palette */
+#cmdPaletteList .palette-group-header {
+    padding: 8px 16px 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+#cmdPaletteList .palette-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background-color 0.1s;
+}
+
+#cmdPaletteList .palette-item:hover,
+#cmdPaletteList .palette-item.palette-highlighted {
+    background-color: rgba(59, 130, 246, 0.15);
+}
+
+#cmdPaletteList .palette-item .palette-item-name {
+    font-size: 13px;
+    color: #e5e7eb;
+}
+
+#cmdPaletteList .palette-item .palette-item-model {
+    font-size: 11px;
+    color: #6b7280;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
+#cmdPaletteList .palette-item .palette-item-provider {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-right: 6px;
+}
+
+#cmdPaletteList .palette-item .palette-bookmark-star {
+    color: #eab308;
+    margin-right: 6px;
+    font-size: 12px;
+}
