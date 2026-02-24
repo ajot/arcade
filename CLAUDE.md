@@ -74,14 +74,12 @@ Custom lightweight implementation supporting: `$.foo.bar` (dot), `$..key` (recur
 2. Include `auth.env_key` with the env var name (e.g., `"env_key": "NEWPROVIDER_API_KEY"`) — app.py reads keys dynamically from definitions, no code changes needed
 3. Add the env var to `.env.example`
 4. Run `python validate.py` to verify the definition
-5. Or use `python add_definition.py --provider <name> --type <type> --discover` to auto-generate
 
 ### Key Files
 
-- `app.py` — Flask routes: `/`, `/api/definitions/<id>`, `/api/generate`, `/api/stream`, `/api/status`, `/api/result`, `/api/bookmarks`
-- `proxy.py` — `build_request()`, `extract_value()`, `extract_outputs()`, `check_done()`
-- `static/app.js` — All client logic: form rendering, streaming/polling dispatch, compare mode, bookmarks, type/provider filtering
+- `app.py` — Flask routes: `/`, `/api/definitions/<id>`, `/api/generate`, `/api/stream`, `/api/status`, `/api/result`, `/api/bookmarks`, `/api/preview`, `/api/validate-keys`
+- `proxy.py` — `build_request()`, `build_curl_string()`, `extract_value()`, `extract_outputs()`, `check_done()`
+- `static/app.js` — All client logic: form rendering, streaming/polling dispatch, compare mode, bookmarks, command palette
 - `templates/index.html` — Single-page Jinja2 template with Tailwind CSS
 - `validate.py` — Definition schema validator (run before committing new definitions)
-- `add_definition.py` — CLI tool to generate definition files with model discovery
-- `bookmarks.json` — Server-side bookmark persistence (not committed to repo ideally)
+- `bookmarks.json` — Server-side bookmark persistence (gitignored)

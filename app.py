@@ -310,7 +310,7 @@ def stream():
                         token = extract_value(chunk, stream_path) if stream_path else ""
                         if token:
                             yield f"data: {json.dumps({'token': token})}\n\n"
-                    except (json.JSONDecodeError, Exception):
+                    except (json.JSONDecodeError, KeyError, TypeError, IndexError):
                         pass
 
             yield f"event: done\ndata: {{}}\n\n"

@@ -301,3 +301,19 @@ header select {
     border-left: 2px solid #f59e0b;
     padding-left: 14px;
 }
+
+/* Settings section toggle arrow */
+#settingsArrow {
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+
+/* Settings content reveal */
+.settings-content {
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* Settings summary */
+#settingsSummary {
+    font-size: 11px;
+}

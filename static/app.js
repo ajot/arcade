@@ -194,15 +194,6 @@ function hideProgress() {
 // System prompt
 // ---------------------------------------------------------------------------
 
-function toggleSystemPrompt() {
-    const input = document.getElementById('systemPromptInput');
-    const arrow = document.getElementById('systemPromptArrow');
-    const isHidden = input.classList.contains('hidden');
-    input.classList.toggle('hidden');
-    arrow.innerHTML = isHidden ? '&#9660;' : '&#9654;';
-    if (isHidden) input.focus();
-}
-
 function showSystemPromptGroup() {
     document.getElementById('systemPromptGroup').classList.remove('hidden');
 }
@@ -210,8 +201,79 @@ function showSystemPromptGroup() {
 function hideSystemPromptGroup() {
     document.getElementById('systemPromptGroup').classList.add('hidden');
     document.getElementById('systemPromptInput').value = '';
-    document.getElementById('systemPromptInput').classList.add('hidden');
-    document.getElementById('systemPromptArrow').innerHTML = '&#9654;';
+}
+
+// ---------------------------------------------------------------------------
+// Settings section (collapsible advanced params + system prompt)
+// ---------------------------------------------------------------------------
+
+function toggleSettings() {
+    const content = document.getElementById('settingsContent');
+    const arrow = document.getElementById('settingsArrow');
+    const summary = document.getElementById('settingsSummary');
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        arrow.style.transform = 'rotate(90deg)';
+        summary.classList.add('hidden');
+    } else {
+        collapseSettings();
+    }
+}
+
+function collapseSettings() {
+    const content = document.getElementById('settingsContent');
+    const arrow = document.getElementById('settingsArrow');
+    const summary = document.getElementById('settingsSummary');
+    content.classList.add('hidden');
+    arrow.style.transform = '';
+    summary.classList.remove('hidden');
+    updateSettingsSummaryFromDOM();
+}
+
+function updateSettingsSummary(advancedParams) {
+    const summary = document.getElementById('settingsSummary');
+    if (!summary) return;
+    const parts = [];
+    for (const p of advancedParams) {
+        if (p.default != null) {
+            parts.push(`${p.name}: ${p.default}`);
+        }
+    }
+    summary.textContent = parts.length > 0 ? parts.join(' \u00b7 ') : '';
+}
+
+function hideSettingsSection() {
+    document.getElementById('settingsSection').classList.add('hidden');
+    document.getElementById('advancedFields').innerHTML = '';
+    document.getElementById('settingsContent').classList.add('hidden');
+    document.getElementById('settingsArrow').style.transform = '';
+    document.getElementById('settingsSummary').textContent = '';
+}
+
+function updateSettingsSummaryFromDOM() {
+    const summary = document.getElementById('settingsSummary');
+    if (!summary) return;
+    const advancedContainer = document.getElementById('advancedFields');
+    if (!advancedContainer) return;
+    const fields = advancedContainer.querySelectorAll('[data-param-name]');
+    const parts = [];
+    for (const field of fields) {
+        const name = field.dataset.paramName;
+        let value;
+        if (field.tagName === 'INPUT' && field.type === 'range') {
+            value = field.value;
+        } else if (field.tagName === 'DIV') {
+            // Slider wrapper
+            const range = field.querySelector('input[type="range"]');
+            if (range) value = range.value;
+        } else {
+            value = field.value;
+        }
+        if (value != null && value !== '') {
+            parts.push(`${name}: ${value}`);
+        }
+    }
+    summary.textContent = parts.length > 0 ? parts.join(' \u00b7 ') : '';
 }
 
 function definitionUsesChat(definition) {
@@ -727,6 +789,7 @@ async function loadPlayEndpoint(defId) {
     hideModelPicker();
     hideBaseUrl();
     hideSystemPromptGroup();
+    hideSettingsSection();
     showApiKeyStatus(null);
 
     if (!defId) {
@@ -752,6 +815,7 @@ async function loadPlayEndpoint(defId) {
         renderForm(def);
         playground.classList.remove('hidden');
 
+        // System prompt is now rendered inside settings section by renderForm
         if (definitionUsesChat(def)) {
             showSystemPromptGroup();
         }
@@ -893,7 +957,7 @@ function setMode(newMode) {
             playPickers.classList.add('hidden');
             document.getElementById('welcomeState').classList.remove('hidden');
         }
-        // Restore system prompt for play definition
+        // Restore system prompt + settings for play definition
         hideSystemPromptGroup();
         if (definitionUsesChat(slots.play.definition)) {
             showSystemPromptGroup();
@@ -931,23 +995,12 @@ function setMode(newMode) {
 // ---------------------------------------------------------------------------
 
 function renderForm(definition) {
-    document.getElementById('endpointName').textContent = definition.name;
     document.getElementById('endpointDescription').textContent = definition.description || '';
-
-    // Show provider favicon in endpoint header
-    const favicon = document.getElementById('endpointFavicon');
-    const faviconUrl = getProviderFaviconUrl(definition);
-    if (favicon) {
-        if (faviconUrl) {
-            favicon.src = faviconUrl;
-            favicon.classList.remove('hidden');
-        } else {
-            favicon.classList.add('hidden');
-        }
-    }
 
     const container = document.getElementById('formFields');
     container.innerHTML = '';
+    const advancedContainer = document.getElementById('advancedFields');
+    advancedContainer.innerHTML = '';
 
     // Example buttons
     const exRow = document.getElementById('examplesRow');
@@ -957,7 +1010,7 @@ function renderForm(definition) {
         for (const example of definition.examples) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-all active:scale-95';
+            btn.className = 'border border-gray-700/60 hover:border-gray-500 text-gray-400 hover:text-gray-200 text-xs px-3.5 py-1.5 rounded-full transition-all active:scale-95 hover:bg-gray-800/40';
             btn.textContent = example.label;
             btn.onclick = () => fillExample(example.params);
             exBtns.appendChild(btn);
@@ -967,14 +1020,41 @@ function renderForm(definition) {
         exRow.classList.add('hidden');
     }
 
-    let staggerIndex = 0;
+    // Split params into regular and advanced
+    const regularParams = [];
+    const advancedParams = [];
     for (const param of definition.request.params) {
         if (param.name === 'model' && param.ui === 'dropdown') continue;
+        if (param.group === 'advanced') {
+            advancedParams.push(param);
+        } else {
+            regularParams.push(param);
+        }
+    }
+
+    // Render regular params
+    let staggerIndex = 0;
+    for (const param of regularParams) {
         const field = createField(param);
         field.classList.add('field-stagger');
         field.style.animationDelay = `${staggerIndex * 50}ms`;
         container.appendChild(field);
         staggerIndex++;
+    }
+
+    // Render advanced params into settings section
+    const settingsSection = document.getElementById('settingsSection');
+    const hasSystemPrompt = definitionUsesChat(definition);
+    if (advancedParams.length > 0 || hasSystemPrompt) {
+        for (const param of advancedParams) {
+            advancedContainer.appendChild(createField(param));
+        }
+        settingsSection.classList.remove('hidden');
+        updateSettingsSummary(advancedParams);
+        // Collapse settings by default
+        collapseSettings();
+    } else {
+        settingsSection.classList.add('hidden');
     }
 }
 
@@ -987,7 +1067,8 @@ function fillExample(params) {
             }
             continue;
         }
-        const fields = document.querySelectorAll(`#formFields [data-param-name="${name}"]`);
+        // Search both regular and advanced fields
+        const fields = document.querySelectorAll(`#formFields [data-param-name="${name}"], #advancedFields [data-param-name="${name}"]`);
         for (const field of fields) {
             field.value = value;
             if (field.type === 'range') {
@@ -995,6 +1076,8 @@ function fillExample(params) {
             }
         }
     }
+    // Update settings summary after filling
+    updateSettingsSummaryFromDOM();
 }
 
 function createField(param) {
@@ -1049,7 +1132,7 @@ function createField(param) {
             const valueDisplay = document.createElement('span');
             valueDisplay.className = 'text-xs text-gray-400 w-12 text-right font-brand';
             valueDisplay.textContent = range.value;
-            range.oninput = () => { valueDisplay.textContent = range.value; };
+            range.oninput = () => { valueDisplay.textContent = range.value; updateSettingsSummaryFromDOM(); };
             range.dataset.paramName = param.name;
             input.appendChild(range);
             input.appendChild(valueDisplay);
@@ -1081,10 +1164,23 @@ function collectParams() {
         }
     }
 
+    // Collect from regular fields
     const fields = document.querySelectorAll('#formFields [data-param-name]');
     for (const field of fields) {
         const name = field.dataset.paramName;
         params[name] = field.value;
+    }
+
+    // Collect from advanced fields (settings section)
+    const advancedFields = document.querySelectorAll('#advancedFields [data-param-name]');
+    for (const field of advancedFields) {
+        const name = field.dataset.paramName;
+        if (field.tagName === 'DIV') {
+            const range = field.querySelector('input[type="range"]');
+            if (range) params[name] = range.value;
+        } else {
+            params[name] = field.value;
+        }
     }
 
     // Include system prompt if present
@@ -1873,11 +1969,9 @@ function updateCompareForm() {
 
     // Show endpoint info
     if (leftDef && rightDef) {
-        document.getElementById('endpointName').textContent = 'Compare';
         document.getElementById('endpointDescription').textContent = `${leftDef.name} vs ${rightDef.name}`;
     } else if (leftDef || rightDef) {
         const def = leftDef || rightDef;
-        document.getElementById('endpointName').textContent = def.name;
         document.getElementById('endpointDescription').textContent = def.description || '';
     } else {
         // No endpoints selected — hide playground entirely
@@ -1892,14 +1986,40 @@ function updateCompareForm() {
 
     const container = document.getElementById('formFields');
     container.innerHTML = '';
+    const advancedContainer = document.getElementById('advancedFields');
+    advancedContainer.innerHTML = '';
 
     // Show merged examples from both definitions
     renderCompareExamples(leftDef, rightDef);
 
+    // Split shared params into regular and advanced
+    const regularShared = [];
+    const advancedShared = [];
     for (const param of shared) {
         if (param.name === 'model' && param.ui === 'dropdown') continue;
-        const field = createField(param);
-        container.appendChild(field);
+        if (param.group === 'advanced') {
+            advancedShared.push(param);
+        } else {
+            regularShared.push(param);
+        }
+    }
+
+    for (const param of regularShared) {
+        container.appendChild(createField(param));
+    }
+
+    // Render advanced shared params into settings section
+    const settingsSection = document.getElementById('settingsSection');
+    const hasSystemPrompt = definitionUsesChat(leftDef) || definitionUsesChat(rightDef);
+    if (advancedShared.length > 0 || hasSystemPrompt) {
+        for (const param of advancedShared) {
+            advancedContainer.appendChild(createField(param));
+        }
+        settingsSection.classList.remove('hidden');
+        updateSettingsSummary(advancedShared);
+        collapseSettings();
+    } else {
+        settingsSection.classList.add('hidden');
     }
 
     // Render side-only params
@@ -1942,7 +2062,7 @@ function renderCompareExamples(leftDef, rightDef) {
     for (const example of examples) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-all active:scale-95';
+        btn.className = 'border border-gray-700/60 hover:border-gray-500 text-gray-400 hover:text-gray-200 text-xs px-3.5 py-1.5 rounded-full transition-all active:scale-95 hover:bg-gray-800/40';
         btn.textContent = example.label;
         btn.onclick = () => fillExample(example.params);
         exBtns.appendChild(btn);
@@ -2228,19 +2348,24 @@ function captureBookmarkState() {
         const formContainer = document.getElementById('formFields');
         const sysPrompt = document.getElementById('systemPromptInput');
 
+        const advancedContainer = document.getElementById('advancedFields');
+        const allParams = { ...collectFormParams(formContainer), ...collectFormParams(advancedContainer) };
+
         state.play = {
             definitionId: slots.play.definition ? slots.play.definition.id : null,
             model: (!modelGroup.classList.contains('hidden') && modelPicker.value) ? modelPicker.value : null,
-            params: collectFormParams(formContainer),
+            params: allParams,
             systemPrompt: sysPrompt ? sysPrompt.value : '',
         };
     } else {
         const leftModel = document.getElementById('compareLeftModel');
         const rightModel = document.getElementById('compareRightModel');
         const sharedContainer = document.getElementById('formFields');
+        const compareAdvancedContainer = document.getElementById('advancedFields');
         const leftParamsContainer = document.getElementById('compareLeftParams');
         const rightParamsContainer = document.getElementById('compareRightParams');
         const sysPrompt = document.getElementById('systemPromptInput');
+        const allSharedParams = { ...collectFormParams(sharedContainer), ...collectFormParams(compareAdvancedContainer) };
 
         state.compare = {
             left: {
@@ -2251,7 +2376,7 @@ function captureBookmarkState() {
                 definitionId: slots.right.definition ? slots.right.definition.id : null,
                 model: (!rightModel.classList.contains('hidden') && rightModel.value) ? rightModel.value : null,
             },
-            sharedParams: collectFormParams(sharedContainer),
+            sharedParams: allSharedParams,
             leftParams: leftParamsContainer ? collectFormParams(leftParamsContainer) : {},
             rightParams: rightParamsContainer ? collectFormParams(rightParamsContainer) : {},
             systemPrompt: sysPrompt ? sysPrompt.value : '',
@@ -2299,15 +2424,15 @@ async function restoreBookmark(bookmark) {
                 modelPicker.value = bp.model;
             }
 
-            // Fill form fields
+            // Fill form fields (regular + advanced)
             fillFormFields(bp.params, document.getElementById('formFields'));
+            fillFormFields(bp.params, document.getElementById('advancedFields'));
+            updateSettingsSummaryFromDOM();
 
             // Set system prompt
             if (bp.systemPrompt) {
                 const sysInput = document.getElementById('systemPromptInput');
                 sysInput.value = bp.systemPrompt;
-                sysInput.classList.remove('hidden');
-                document.getElementById('systemPromptArrow').innerHTML = '&#9660;';
             }
 
         } else if (bookmark.mode === 'compare' && bookmark.compare) {
@@ -2327,8 +2452,10 @@ async function restoreBookmark(bookmark) {
                 }
             }
 
-            // Fill shared form fields
+            // Fill shared form fields (regular + advanced)
             fillFormFields(bc.sharedParams, document.getElementById('formFields'));
+            fillFormFields(bc.sharedParams, document.getElementById('advancedFields'));
+            updateSettingsSummaryFromDOM();
 
             // Fill side-only params
             fillFormFields(bc.leftParams, document.getElementById('compareLeftParams'));
@@ -2338,8 +2465,6 @@ async function restoreBookmark(bookmark) {
             if (bc.systemPrompt) {
                 const sysInput = document.getElementById('systemPromptInput');
                 sysInput.value = bc.systemPrompt;
-                sysInput.classList.remove('hidden');
-                document.getElementById('systemPromptArrow').innerHTML = '&#9660;';
             }
         }
 

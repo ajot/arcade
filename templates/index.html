@@ -25,7 +25,7 @@
 
         <!-- Row 2: Play mode endpoint label + model picker -->
         <div id="playPickers" class="hidden border-t border-gray-800/50">
-            <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
+            <div class="max-w-5xl mx-auto flex items-center justify-center gap-4 px-6 py-2">
                 <button id="endpointLabelBtn" onclick="openPalette()"
                         class="flex items-center gap-2 bg-transparent border border-gray-800 rounded-full px-4 py-1.5 text-sm text-gray-300 hover:border-gray-600 hover:text-white transition-colors">
                     <span id="endpointLabelText">Select an endpoint...</span>
@@ -98,32 +98,38 @@
         <!-- Endpoint info -->
         <div id="playground" class="hidden">
             <div class="mb-8">
-                <div class="flex items-center gap-2.5 mb-1">
-                    <img id="endpointFavicon" class="w-5 h-5 hidden rounded-sm" src="" alt="">
-                    <h2 id="endpointName" class="text-lg font-light text-white"></h2>
-                </div>
                 <p id="endpointDescription" class="text-sm text-gray-500"></p>
                 <p id="baseUrl" class="text-xs text-gray-600 font-mono mt-1 hidden"></p>
             </div>
 
             <!-- Examples -->
-            <div id="examplesRow" class="mb-6 hidden">
+            <div id="examplesRow" class="mb-8 hidden">
                 <div id="exampleButtons" class="flex flex-wrap gap-2"></div>
             </div>
 
-            <!-- System prompt (collapsible) -->
-            <div id="systemPromptGroup" class="mb-5 hidden">
-                <button type="button" onclick="toggleSystemPrompt()" class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2">
-                    <span id="systemPromptArrow" class="text-[10px]">&#9654;</span>
-                    System prompt
-                </button>
-                <textarea id="systemPromptInput"
-                          class="w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-amber-500 resize-y hidden"
-                          rows="3" placeholder="You are a helpful assistant..."></textarea>
-            </div>
-
-            <!-- Form fields -->
+            <!-- Form fields (regular params only) -->
             <div id="formFields" class="space-y-5"></div>
+
+            <!-- Settings: collapsible advanced params + system prompt -->
+            <div id="settingsSection" class="mt-5 hidden">
+                <button type="button" id="settingsToggle" onclick="toggleSettings()"
+                        class="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors w-full">
+                    <span id="settingsArrow" class="text-[10px] transition-transform">&#9654;</span>
+                    <span>Settings</span>
+                    <span id="settingsSummary" class="ml-1 text-gray-600 font-brand truncate"></span>
+                </button>
+                <div id="settingsContent" class="hidden mt-3 space-y-4 settings-content">
+                    <!-- System prompt (rendered here when applicable) -->
+                    <div id="systemPromptGroup" class="hidden">
+                        <label class="block text-xs text-gray-400 mb-1.5">system prompt</label>
+                        <textarea id="systemPromptInput"
+                                  class="w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-amber-500 resize-y"
+                                  rows="3" placeholder="You are a helpful assistant..."></textarea>
+                    </div>
+                    <!-- Advanced param fields rendered here by JS -->
+                    <div id="advancedFields" class="space-y-5"></div>
+                </div>
+            </div>
 
             <!-- Compare: side-only params (rendered above Generate) -->
             <div id="compareSideParams" class="hidden mt-5 grid grid-cols-2 gap-6">
@@ -152,7 +158,7 @@
                     Generate
                 </button>
                 <button id="curlPreviewBtn" onclick="openCurlModal()"
-                        class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-medium px-3 py-2.5 rounded-md transition-colors font-brand">curl</button>
+                        class="text-gray-500 hover:text-gray-300 text-xs px-2 py-2.5 transition-colors font-brand">curl</button>
             </div>
         </div>
 
