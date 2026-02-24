@@ -286,6 +286,32 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function renderSaveBookmarkRow(list, q) {
+    const hasLoadedEndpoint = (mode === 'play' && slots.play.definition)
+        || (mode === 'compare' && (slots.left.definition || slots.right.definition));
+    if (!hasLoadedEndpoint) return;
+    if (q && !'save bookmark'.includes(q)) return;
+
+    const saveIdx = paletteItems.length;
+    const saveItem = document.createElement('div');
+    saveItem.className = 'palette-item' + (saveIdx === 0 ? ' palette-highlighted' : '');
+    saveItem.dataset.index = saveIdx;
+
+    const saveLeft = document.createElement('span');
+    saveLeft.innerHTML = '<span style="color:#6b7280;margin-right:6px;">+</span>'
+        + '<span class="palette-item-name" style="color:#9ca3af;">Save as bookmark...</span>';
+
+    saveItem.appendChild(saveLeft);
+    saveItem.onmouseenter = () => highlightPaletteItem(saveIdx);
+    saveItem.onclick = (e) => {
+        e.stopPropagation();
+        startInlineBookmarkSave(saveItem);
+    };
+    list.appendChild(saveItem);
+
+    paletteItems.push({ type: 'save-bookmark' });
+}
+
 function renderPaletteList(query) {
     const list = document.getElementById('cmdPaletteList');
     list.innerHTML = '';
@@ -349,29 +375,7 @@ function renderPaletteList(query) {
         }
     }
 
-    // --- Save as bookmark row ---
-    const hasLoadedEndpoint = (mode === 'play' && slots.play.definition)
-        || (mode === 'compare' && (slots.left.definition || slots.right.definition));
-    if (hasLoadedEndpoint) {
-        const saveIdx = paletteItems.length;
-        const saveItem = document.createElement('div');
-        saveItem.className = 'palette-item' + (saveIdx === 0 ? ' palette-highlighted' : '');
-        saveItem.dataset.index = saveIdx;
-
-        const saveLeft = document.createElement('span');
-        saveLeft.innerHTML = '<span style="color:#6b7280;margin-right:6px;">+</span>'
-            + '<span class="palette-item-name" style="color:#9ca3af;">Save as bookmark...</span>';
-
-        saveItem.appendChild(saveLeft);
-        saveItem.onmouseenter = () => highlightPaletteItem(saveIdx);
-        saveItem.onclick = (e) => {
-            e.stopPropagation();
-            startInlineBookmarkSave(saveItem);
-        };
-        list.appendChild(saveItem);
-
-        paletteItems.push({ type: 'save-bookmark' });
-    }
+    renderSaveBookmarkRow(list, q);
 
     // --- Endpoint sections grouped by output_type, validated first ---
     let filtered = DEFINITIONS_LIST;
@@ -522,29 +526,7 @@ function renderPaletteModelList(query) {
         paletteItems.push({ type: 'model', value: model });
     }
 
-    // --- Save as bookmark row ---
-    const hasLoadedEndpoint = (mode === 'play' && slots.play.definition)
-        || (mode === 'compare' && (slots.left.definition || slots.right.definition));
-    if (hasLoadedEndpoint && (!q || 'save bookmark'.includes(q))) {
-        const saveIdx = paletteItems.length;
-        const saveItem = document.createElement('div');
-        saveItem.className = 'palette-item' + (saveIdx === 0 ? ' palette-highlighted' : '');
-        saveItem.dataset.index = saveIdx;
-
-        const saveLeft = document.createElement('span');
-        saveLeft.innerHTML = '<span style="color:#6b7280;margin-right:6px;">+</span>'
-            + '<span class="palette-item-name" style="color:#9ca3af;">Save as bookmark...</span>';
-
-        saveItem.appendChild(saveLeft);
-        saveItem.onmouseenter = () => highlightPaletteItem(saveIdx);
-        saveItem.onclick = (e) => {
-            e.stopPropagation();
-            startInlineBookmarkSave(saveItem);
-        };
-        list.appendChild(saveItem);
-
-        paletteItems.push({ type: 'save-bookmark' });
-    }
+    renderSaveBookmarkRow(list, q);
 
     if (paletteItems.length === 0) {
         const empty = document.createElement('div');
