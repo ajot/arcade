@@ -45,9 +45,13 @@ def load_definitions():
             if not fname.endswith(".json"):
                 continue
             path = os.path.join(root, fname)
-            with open(path) as f:
-                defn = json.load(f)
-            DEFINITIONS[defn["id"]] = defn
+            try:
+                with open(path) as f:
+                    defn = json.load(f)
+                DEFINITIONS[defn["id"]] = defn
+            except (json.JSONDecodeError, KeyError, OSError) as e:
+                print(f"WARNING: skipping {path}: {e}")
+                continue
 
             # Collect provider display name from definition
             provider = defn.get("provider", "")
