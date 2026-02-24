@@ -1105,63 +1105,9 @@ async function onGenerate() {
     hideResults();
     setGenerating(true);
 
-    const pattern = def.interaction.pattern;
-
-    if (pattern === 'streaming') {
-        log(`POST /api/stream (${def.name})`, 'request');
-        log(`Params: ${JSON.stringify(params)}`, 'info');
-        startStreaming('play', params);
-    } else {
-        log(`POST /api/generate (${def.name})`, 'request');
-        log(`Params: ${JSON.stringify(params)}`, 'info');
-        const syncStart = performance.now();
-
-        try {
-            slots.play.abortController = new AbortController();
-            const resp = await fetch('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    definition_id: def.id,
-                    params: params,
-                }),
-                signal: slots.play.abortController.signal,
-            });
-
-            const data = await resp.json();
-            const submitTime = performance.now() - syncStart;
-            slots.play.lastSentParams = { definitionId: def.id, params };
-
-            log(`Response: ${resp.status}`, resp.ok ? 'response' : 'error');
-
-            if (data.error) {
-                showError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
-                setGenerating(false);
-                return;
-            }
-
-            if (pattern === 'polling' && data.request_id) {
-                log(`Job submitted in ${submitTime.toFixed(0)}ms. request_id: ${data.request_id}`, 'info');
-                await pollLoop('play', data.request_id);
-                setGenerating(false);
-            } else {
-                const syncMetrics = { totalTime: performance.now() - syncStart, submitTime };
-                slots.play.lastResponse = data.response;
-                if (data.outputs && data.outputs.length > 0) {
-                    renderOutputs(data.outputs, 'play');
-                } else {
-                    renderOutputs([{type: 'text', value: [JSON.stringify(data.response, null, 2)]}], 'play');
-                }
-                renderMetrics(syncMetrics, getSlotElement('play', 'metrics'));
-                setGenerating(false);
-            }
-        } catch (e) {
-            if (e.name === 'AbortError') return;
-            log(`Error: ${e.message}`, 'error');
-            showError(e.message);
-            setGenerating(false);
-        }
-    }
+    log(`Params: ${JSON.stringify(params)}`, 'info');
+    await executeGenerate('play', params);
+    setGenerating(false);
 }
 
 // ---------------------------------------------------------------------------
@@ -2108,8 +2054,8 @@ async function onCompareGenerate() {
 
     // Execute both sides in parallel
     const results = await Promise.allSettled([
-        executeSlot('left', leftParams),
-        executeSlot('right', rightParams),
+        executeGenerate('left', leftParams),
+        executeGenerate('right', rightParams),
     ]);
 
     log('Compare generation complete.', 'info');
@@ -2125,7 +2071,7 @@ function collectSideParams(side, params) {
     }
 }
 
-async function executeSlot(slotId, params) {
+async function executeGenerate(slotId, params) {
     const slot = slots[slotId];
     const def = slot.definition;
     const pattern = def.interaction.pattern;
