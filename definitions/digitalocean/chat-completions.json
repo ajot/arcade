@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "do-chat-completions",
   "provider": "digitalocean",
+  "provider_display_name": "DigitalOcean",
   "provider_url": "digitalocean.com",
   "name": "DigitalOcean Chat Completions",
   "description": "Chat completions via DigitalOcean Gradient AI (OpenAI-compatible)",

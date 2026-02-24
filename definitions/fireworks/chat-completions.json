@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "fireworks-chat-completions",
   "provider": "fireworks",
+  "provider_display_name": "Fireworks",
   "provider_url": "fireworks.ai",
   "name": "Fireworks AI Chat Completions",
   "description": "Fireworks AI chat with streaming (OpenAI-compatible)",

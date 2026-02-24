@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "cerebras-chat-completions",
   "provider": "cerebras",
+  "provider_display_name": "Cerebras",
   "provider_url": "cerebras.ai",
   "name": "Cerebras Chat Completions",
   "description": "Cerebras chat with streaming (OpenAI-compatible)",

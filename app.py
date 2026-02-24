@@ -34,6 +34,7 @@ API_KEYS = {}
 # ---------------------------------------------------------------------------
 
 DEFINITIONS = {}
+PROVIDER_DISPLAY_NAMES = {}
 
 
 def load_definitions():
@@ -48,8 +49,14 @@ def load_definitions():
                 defn = json.load(f)
             DEFINITIONS[defn["id"]] = defn
 
-            # Load API key from auth.env_key (if not already loaded for this provider)
+            # Collect provider display name from definition
             provider = defn.get("provider", "")
+            if provider and provider not in PROVIDER_DISPLAY_NAMES:
+                PROVIDER_DISPLAY_NAMES[provider] = defn.get(
+                    "provider_display_name", provider.title()
+                )
+
+            # Load API key from auth.env_key (if not already loaded for this provider)
             env_key = defn.get("auth", {}).get("env_key", "")
             if provider and env_key and provider not in API_KEYS:
                 val = os.getenv(env_key, "")
@@ -62,18 +69,6 @@ load_definitions()
 # ---------------------------------------------------------------------------
 # Routes — Pages
 # ---------------------------------------------------------------------------
-
-
-PROVIDER_DISPLAY_NAMES = {
-    "deepinfra": "DeepInfra",
-    "deepseek": "DeepSeek",
-    "digitalocean": "DigitalOcean",
-    "huggingface": "Hugging Face",
-    "openai": "OpenAI",
-    "openrouter": "OpenRouter",
-    "sambanova": "SambaNova",
-    "together": "Together AI",
-}
 
 
 def provider_display_name(slug):

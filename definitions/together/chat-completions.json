@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "together-chat-completions",
   "provider": "together",
+  "provider_display_name": "Together AI",
   "provider_url": "together.ai",
   "name": "Together AI Chat Completions",
   "description": "Together AI chat with streaming (OpenAI-compatible)",

@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "openai-image-generation",
   "provider": "openai",
+  "provider_display_name": "OpenAI",
   "provider_url": "openai.com",
   "name": "OpenAI Image Generation",
   "description": "Image generation via OpenAI (DALL-E 3, GPT Image)",

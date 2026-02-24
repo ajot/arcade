@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "google-image-generation",
   "provider": "google",
+  "provider_display_name": "Google",
   "provider_url": "ai.google.dev",
   "name": "Google Imagen Image Generation",
   "description": "Text-to-image generation via Google Imagen 4 (Gemini API)",

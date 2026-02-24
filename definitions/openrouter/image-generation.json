@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "openrouter-image-generation",
   "provider": "openrouter",
+  "provider_display_name": "OpenRouter",
   "provider_url": "openrouter.ai",
   "name": "OpenRouter Image Generation",
   "description": "Image generation via OpenRouter (GPT Image, Gemini Image, FLUX, Seedream, Riverflow)",

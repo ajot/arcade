@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "perplexity-chat-completions",
   "provider": "perplexity",
+  "provider_display_name": "Perplexity",
   "provider_url": "perplexity.ai",
   "name": "Perplexity Chat Completions",
   "description": "Perplexity chat with streaming (OpenAI-compatible)",

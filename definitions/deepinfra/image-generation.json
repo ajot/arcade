@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "deepinfra-image-generation",
   "provider": "deepinfra",
+  "provider_display_name": "DeepInfra",
   "provider_url": "deepinfra.com",
   "name": "DeepInfra Image Generation",
   "description": "Text-to-image generation via DeepInfra (FLUX, Stable Diffusion, Seedream, and more)",

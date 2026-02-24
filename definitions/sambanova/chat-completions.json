@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "sambanova-chat-completions",
   "provider": "sambanova",
+  "provider_display_name": "SambaNova",
   "provider_url": "sambanova.ai",
   "name": "SambaNova Chat Completions",
   "description": "SambaNova chat with streaming (OpenAI-compatible)",

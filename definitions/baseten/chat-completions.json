@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "baseten-chat-completions",
   "provider": "baseten",
+  "provider_display_name": "Baseten",
   "provider_url": "baseten.co",
   "name": "Baseten Chat Completions",
   "description": "Baseten Model APIs \u2014 OpenAI-compatible inference for open-source LLMs",
