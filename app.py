@@ -147,13 +147,18 @@ def preview():
     data = request.get_json()
     definition_id = data.get("definition_id")
     params = data.get("params", {})
+    include_key = data.get("include_key", False)
 
     defn = DEFINITIONS.get(definition_id)
     if not defn:
         return jsonify({"error": f"Definition '{definition_id}' not found"}), 404
 
+    api_key = None
+    if include_key:
+        _, api_key = get_api_key(definition_id)
+
     try:
-        curl = build_curl_string(defn, params)
+        curl = build_curl_string(defn, params, api_key=api_key or None)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -188,6 +193,11 @@ def generate():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
+    # When a streaming definition is called via /api/generate (sync mode),
+    # override stream to false so the provider returns a complete response.
+    if body and body.get("stream") is True:
+        body["stream"] = False
+
     try:
         resp = http_requests.request(
             method=defn["request"]["method"],
@@ -221,8 +231,9 @@ def generate():
         request_id = extract_value(resp_data, rid_path)
         result["request_id"] = request_id
 
-    # For sync responses, extract typed outputs (images, audio, etc.)
-    if resp.ok and interaction.get("pattern") not in ("polling", "streaming"):
+    # For sync responses (including streaming defs called via /api/generate),
+    # extract typed outputs (images, audio, etc.)
+    if resp.ok and "request_id" not in result:
         outputs = extract_outputs(defn, resp_data)
         if outputs:
             # Convert base64 image/audio values to data URLs for client rendering

@@ -37,6 +37,7 @@ let paletteStep = 'endpoint'; // 'endpoint' | 'model'
 let palettePendingDefId = null; // Definition ID chosen in step 1
 let palettePendingDef = null; // Full definition object (fetched)
 let palettePendingIsCompare = false; // Whether Shift was held in step 1
+let streamEnabled = true; // Toggle for streaming vs sync on streaming-capable endpoints
 
 function createSlot() {
     return {
@@ -756,6 +757,7 @@ async function loadPlayEndpoint(defId) {
         }
 
         showApiKeyStatus(def.provider);
+        updateStreamToggle(def);
         updateEndpointLabel();
         log(`Loaded: ${def.name}`, 'info');
     } catch (e) {
@@ -1447,11 +1449,13 @@ function renderRawFallback(data, slotId) {
 // Curl preview — fetches curl from server-side /api/preview
 // ---------------------------------------------------------------------------
 
-async function fetchCurlPreview(definitionId, params) {
+let curlIncludeKey = false;
+
+async function fetchCurlPreview(definitionId, params, includeKey = false) {
     const resp = await fetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ definition_id: definitionId, params }),
+        body: JSON.stringify({ definition_id: definitionId, params, include_key: includeKey }),
     });
     const data = await resp.json();
     return data.curl || '# Error generating curl preview';
@@ -1462,6 +1466,8 @@ async function openCurlModal() {
     const playBody = document.getElementById('curlPlayBody');
     const compareBody = document.getElementById('curlCompareBody');
     const playCopyBtn = document.getElementById('curlCopyBtnPlay');
+    const toggle = document.getElementById('curlIncludeKeyToggle');
+    if (toggle) toggle.checked = curlIncludeKey;
 
     playBody.classList.add('hidden');
     compareBody.classList.add('hidden');
@@ -1476,7 +1482,7 @@ async function openCurlModal() {
         playCopyBtn.classList.remove('hidden');
         panel.style.maxWidth = '42rem';
         document.getElementById('curlModal').classList.remove('hidden');
-        document.getElementById('curlPlayContent').textContent = await fetchCurlPreview(def.id, params);
+        document.getElementById('curlPlayContent').textContent = await fetchCurlPreview(def.id, params, curlIncludeKey);
     } else {
         // Show modal immediately with loading state
         for (const side of ['Left', 'Right']) {
@@ -1499,7 +1505,7 @@ async function openCurlModal() {
                 if (labelEl) labelEl.textContent = side;
             } else {
                 const params = collectCompareParams(slotId);
-                contentEl.textContent = await fetchCurlPreview(def.id, params);
+                contentEl.textContent = await fetchCurlPreview(def.id, params, curlIncludeKey);
                 const provider = PROVIDER_NAMES[def.provider] || def.provider;
                 const modelPicker = document.getElementById(`compare${side}Model`);
                 const modelVal = modelPicker && !modelPicker.classList.contains('hidden') ? modelPicker.value : '';
@@ -1507,6 +1513,12 @@ async function openCurlModal() {
             }
         }));
     }
+}
+
+async function toggleCurlIncludeKey() {
+    curlIncludeKey = document.getElementById('curlIncludeKeyToggle').checked;
+    // Re-fetch with updated flag — reuse openCurlModal which rebuilds everything
+    await openCurlModal();
 }
 
 function closeCurlModal() {
@@ -2087,12 +2099,29 @@ function collectSideParams(side, params) {
     }
 }
 
+function updateStreamToggle(def) {
+    const toggle = document.getElementById('streamToggle');
+    if (!toggle) return;
+    if (def && def.interaction.pattern === 'streaming') {
+        toggle.classList.remove('hidden');
+    } else {
+        toggle.classList.add('hidden');
+        streamEnabled = true; // reset when switching to non-streaming endpoint
+    }
+    const checkbox = document.getElementById('streamToggleCheckbox');
+    if (checkbox) checkbox.checked = streamEnabled;
+}
+
+function toggleStreaming() {
+    streamEnabled = document.getElementById('streamToggleCheckbox').checked;
+}
+
 async function executeGenerate(slotId, params) {
     const slot = slots[slotId];
     const def = slot.definition;
     const pattern = def.interaction.pattern;
 
-    if (pattern === 'streaming') {
+    if (pattern === 'streaming' && streamEnabled) {
         log(`[${slotId}] POST /api/stream (${def.name})`, 'request');
         await startStreaming(slotId, params);
     } else {

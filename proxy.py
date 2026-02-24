@@ -13,20 +13,22 @@ def build_auth_headers(definition, api_key):
     return headers
 
 
-def build_curl_string(definition, params, api_key_placeholder="<API_KEY>"):
+def build_curl_string(definition, params, api_key_placeholder="<API_KEY>", api_key=None):
     """Build a curl command string from a definition and params.
 
     Uses build_request() internally but replaces the real API key with a
-    placeholder so no secrets leak into the UI.
+    placeholder so no secrets leak into the UI.  When *api_key* is provided
+    the real key is kept in the output instead.
     """
-    url, headers, body = build_request(definition, params, api_key="PLACEHOLDER")
+    url, headers, body = build_request(definition, params, api_key=api_key or "PLACEHOLDER")
 
-    # Replace the placeholder API key in auth headers
-    auth = definition.get("auth", {})
-    if auth.get("type") == "header":
-        header_name = auth["header"]
-        prefix = auth.get("prefix", "")
-        headers[header_name] = f"{prefix}{api_key_placeholder}"
+    # Replace the placeholder API key in auth headers only when no real key
+    if api_key is None:
+        auth = definition.get("auth", {})
+        if auth.get("type") == "header":
+            header_name = auth["header"]
+            prefix = auth.get("prefix", "")
+            headers[header_name] = f"{prefix}{api_key_placeholder}"
 
     method = definition["request"].get("method", "POST").upper()
     parts = [f"curl -X {method} '{_escape_single_quotes(url)}'"]
