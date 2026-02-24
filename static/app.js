@@ -1010,7 +1010,7 @@ function renderForm(definition) {
         for (const example of definition.examples) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'border border-gray-700/60 hover:border-gray-500 text-gray-400 hover:text-gray-200 text-xs px-3.5 py-1.5 rounded-full transition-all active:scale-95 hover:bg-gray-800/40';
+            btn.className = 'bg-gray-800/50 border border-gray-700/40 hover:bg-gray-700/50 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3.5 py-1.5 rounded-full transition-all active:scale-95';
             btn.textContent = example.label;
             btn.onclick = () => fillExample(example.params);
             exBtns.appendChild(btn);
@@ -1083,6 +1083,8 @@ function fillExample(params) {
 function createField(param) {
     const wrapper = document.createElement('div');
 
+    const isPrimaryTextarea = param.ui === 'textarea' && param.body_path === '_chat_message';
+
     const label = document.createElement('label');
     label.className = 'block text-xs text-gray-400 mb-1.5';
     label.textContent = param.name;
@@ -1092,10 +1094,11 @@ function createField(param) {
         star.textContent = '*';
         label.appendChild(star);
     }
-    wrapper.appendChild(label);
+    if (!isPrimaryTextarea) {
+        wrapper.appendChild(label);
+    }
 
     let input;
-    const isPrimaryTextarea = param.ui === 'textarea' && param.body_path === '_chat_message';
 
     switch (param.ui) {
         case 'textarea':
@@ -1788,12 +1791,12 @@ function setGenerating(active) {
     if (active) {
         btn.disabled = true;
         btn.innerHTML = '<span class="btn-spinner"></span>Generating';
-        btn.className = 'flex-1 bg-gray-700 text-gray-400 text-sm font-semibold py-2.5 rounded-md cursor-not-allowed';
+        btn.className = 'px-16 bg-gray-700 text-gray-400 text-sm font-semibold py-2.5 rounded-md cursor-not-allowed';
         showProgress();
     } else {
         btn.disabled = false;
         btn.textContent = 'Generate';
-        btn.className = 'flex-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]';
+        btn.className = 'px-16 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]';
         hideProgress();
     }
 }
@@ -1937,11 +1940,11 @@ function checkCompareCompatibility() {
             warning.classList.remove('hidden');
         }
         btn.disabled = true;
-        btn.className = 'flex-1 bg-gray-700 text-gray-400 text-sm font-semibold py-2.5 rounded-md cursor-not-allowed';
+        btn.className = 'px-16 bg-gray-700 text-gray-400 text-sm font-semibold py-2.5 rounded-md cursor-not-allowed';
     } else {
         if (warning) warning.classList.add('hidden');
         btn.disabled = false;
-        btn.className = 'flex-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]';
+        btn.className = 'px-16 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]';
     }
 }
 
@@ -2062,7 +2065,7 @@ function renderCompareExamples(leftDef, rightDef) {
     for (const example of examples) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'border border-gray-700/60 hover:border-gray-500 text-gray-400 hover:text-gray-200 text-xs px-3.5 py-1.5 rounded-full transition-all active:scale-95 hover:bg-gray-800/40';
+        btn.className = 'bg-gray-800/50 border border-gray-700/40 hover:bg-gray-700/50 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3.5 py-1.5 rounded-full transition-all active:scale-95';
         btn.textContent = example.label;
         btn.onclick = () => fillExample(example.params);
         exBtns.appendChild(btn);

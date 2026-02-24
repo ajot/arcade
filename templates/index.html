@@ -97,13 +97,14 @@
 
         <!-- Endpoint info -->
         <div id="playground" class="hidden">
-            <div class="mb-8">
+            <div class="mb-6">
                 <p id="endpointDescription" class="text-sm text-gray-500"></p>
-                <p id="baseUrl" class="text-xs text-gray-600 font-mono mt-1 hidden"></p>
+                <p id="baseUrl" class="text-xs text-gray-700 font-mono mt-1 hidden"></p>
             </div>
 
+            <div id="formCard" class="border border-gray-800/60 bg-gray-900/30 rounded-xl p-6">
             <!-- Examples -->
-            <div id="examplesRow" class="mb-8 hidden">
+            <div id="examplesRow" class="mb-6 hidden">
                 <div id="exampleButtons" class="flex flex-wrap gap-2"></div>
             </div>
 
@@ -111,12 +112,12 @@
             <div id="formFields" class="space-y-5"></div>
 
             <!-- Settings: collapsible advanced params + system prompt -->
-            <div id="settingsSection" class="mt-5 hidden">
+            <div id="settingsSection" class="mt-5 pt-5 border-t border-gray-800/40 hidden">
                 <button type="button" id="settingsToggle" onclick="toggleSettings()"
                         class="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors w-full">
                     <span id="settingsArrow" class="text-[10px] transition-transform">&#9654;</span>
                     <span>Settings</span>
-                    <span id="settingsSummary" class="ml-1 text-gray-600 font-brand truncate"></span>
+                    <span id="settingsSummary" class="ml-1 text-gray-700 font-brand truncate"></span>
                 </button>
                 <div id="settingsContent" class="hidden mt-3 space-y-4 settings-content">
                     <!-- System prompt (rendered here when applicable) -->
@@ -147,18 +148,19 @@
             <p id="compareWarning" class="hidden mt-4 text-xs text-amber-400 border border-amber-900/50 rounded-md px-3 py-2"></p>
 
             <!-- Stream toggle + Generate button + curl -->
-            <div class="mt-6 flex items-center gap-3">
+            <div class="mt-6 flex items-center justify-center gap-3">
                 <label id="streamToggle" class="hidden flex items-center gap-1.5 cursor-pointer select-none">
                     <input type="checkbox" id="streamToggleCheckbox" checked onchange="toggleStreaming()"
                            class="accent-amber-500 w-3 h-3 rounded cursor-pointer">
                     <span class="text-xs text-gray-400">Stream</span>
                 </label>
                 <button id="generateBtn" onclick="onGenerate()"
-                        class="flex-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]">
+                        class="px-16 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]">
                     Generate
                 </button>
                 <button id="curlPreviewBtn" onclick="openCurlModal()"
                         class="text-gray-500 hover:text-gray-300 text-xs px-2 py-2.5 transition-colors font-brand">curl</button>
+            </div>
             </div>
         </div>
 
