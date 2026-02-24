@@ -111,7 +111,15 @@ You only need keys for the providers you want to test. Keys are stored locally i
 
 ## Adding a provider
 
-Create a JSON file in `definitions/<provider>/`. The definition has four sections:
+If you use [Claude Code](https://docs.anthropic.com/en/docs/claude-code), the repo includes a built-in skill that generates definition files for you. Just describe what you want:
+
+```
+Add a chat completions definition for Mistral
+```
+
+Claude Code will look at existing definitions for the right patterns, write the JSON, validate it, and update `.env.example` — no manual work needed.
+
+To add a provider manually, create a JSON file in `definitions/<provider>/`. The definition has four sections:
 
 | Section | Purpose |
 |---|---|
@@ -209,6 +217,20 @@ Each parameter in `request.params` needs a `ui` type that tells Arcade how to re
 | `min` / `max` | slider only | Range bounds for the slider |
 | `placeholder` | no | Hint text shown in empty inputs |
 | `group` | no | Set to `"advanced"` to place in a collapsible section |
+
+## Contributing
+
+The easiest way to contribute is to add a new provider definition. No frontend or backend code changes needed — just a JSON file.
+
+1. Fork the repo and create a branch
+2. Add your definition to `definitions/<provider>/`
+   - Use Claude Code with the built-in skill: `Add a chat completions definition for <provider>`
+   - Or write it manually using an existing definition as reference
+3. Run `python validate.py` to make sure it passes
+4. Add the API key variable to `.env.example`
+5. Open a PR
+
+Bug fixes, UI improvements, and new interaction patterns are also welcome.
 
 ## Project structure
 
