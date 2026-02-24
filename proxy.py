@@ -29,12 +29,18 @@ def build_curl_string(definition, params, api_key_placeholder="<API_KEY>"):
         headers[header_name] = f"{prefix}{api_key_placeholder}"
 
     method = definition["request"].get("method", "POST").upper()
-    parts = [f"curl -X {method} '{url}'"]
+    parts = [f"curl -X {method} '{_escape_single_quotes(url)}'"]
     for key, value in headers.items():
-        parts.append(f"  -H '{key}: {value}'")
+        parts.append(f"  -H '{_escape_single_quotes(key)}: {_escape_single_quotes(value)}'")
     if body:
-        parts.append(f"  -d '{json.dumps(body, indent=2)}'")
+        parts.append(f"  -d '{_escape_single_quotes(json.dumps(body, indent=2))}'")
     return " \\\n".join(parts)
+
+
+def _escape_single_quotes(s):
+    """Escape single quotes for safe use inside single-quoted shell strings."""
+    return str(s).replace("'", "'\\''")
+
 
 
 def build_request(definition, params, api_key):
@@ -63,10 +69,13 @@ def build_request(definition, params, api_key):
             continue
         value = params[name]
         # Coerce types
-        if param_def.get("type") == "integer":
-            value = int(value)
-        elif param_def.get("type") == "float":
-            value = float(value)
+        try:
+            if param_def.get("type") == "integer":
+                value = int(value)
+            elif param_def.get("type") == "float":
+                value = float(value)
+        except (ValueError, TypeError):
+            raise ValueError(f"Parameter '{name}' expects {param_def.get('type')}, got '{value}'")
 
         body_path = param_def.get("body_path")
         if body_path == "_chat_message":
