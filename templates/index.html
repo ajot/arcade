@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>arcade</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -13,7 +16,7 @@
     <header id="topBar" class="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
         <!-- Row 1: Brand + key status -->
         <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 h-14">
-            <span class="text-sm font-semibold text-white tracking-tight mr-2">arcade</span>
+            <a href="#" onclick="goHome(event)" class="text-sm font-semibold text-white tracking-tight mr-2 font-brand no-underline hover:text-gray-300 transition-colors">arcade</a>
 
             <div class="ml-auto flex items-center gap-3">
                 <p id="apiKeyStatus" class="text-xs text-gray-600 hidden"></p>
@@ -24,14 +27,14 @@
         <div id="playPickers" class="hidden border-t border-gray-800/50">
             <div class="max-w-5xl mx-auto flex items-center gap-4 px-6 py-2">
                 <button id="endpointLabelBtn" onclick="openPalette()"
-                        class="flex items-center gap-2 bg-transparent border border-gray-800 rounded-md px-3 py-1 text-sm text-gray-300 hover:border-gray-600 hover:text-white transition-colors">
+                        class="flex items-center gap-2 bg-transparent border border-gray-800 rounded-full px-4 py-1.5 text-sm text-gray-300 hover:border-gray-600 hover:text-white transition-colors">
                     <span id="endpointLabelText">Select an endpoint...</span>
                     <span class="text-[10px] text-gray-600">⌘K</span>
                 </button>
 
                 <div id="modelPickerGroup" class="hidden">
                     <select id="modelPicker"
-                            class="bg-transparent border border-gray-800 rounded-md px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500">
+                            class="bg-transparent border border-gray-800 rounded-full px-4 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-amber-500">
                     </select>
                 </div>
             </div>
@@ -44,11 +47,11 @@
                 <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="text-[10px] text-gray-500 uppercase font-medium shrink-0">Left</span>
                     <button id="compareLeftLabelBtn" onclick="openPalette('left')"
-                            class="flex items-center gap-1 bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 hover:border-gray-600 hover:text-white transition-colors truncate min-w-0">
+                            class="flex items-center gap-1 bg-transparent border border-gray-800 rounded-full px-3 py-1.5 text-xs text-gray-300 hover:border-gray-600 hover:text-white transition-colors truncate min-w-0">
                         <span id="compareLeftLabelText" class="truncate">Select endpoint...</span>
                     </button>
                     <select id="compareLeftModel"
-                            class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                            class="hidden bg-transparent border border-gray-800 rounded-full px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-amber-500 min-w-0">
                     </select>
                     <span id="compareLeftKeyStatus" class="text-[10px] hidden shrink-0"></span>
                 </div>
@@ -57,11 +60,11 @@
                 <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="text-[10px] text-gray-500 uppercase font-medium shrink-0">Right</span>
                     <button id="compareRightLabelBtn" onclick="openPalette('right')"
-                            class="flex items-center gap-1 bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 hover:border-gray-600 hover:text-white transition-colors truncate min-w-0">
+                            class="flex items-center gap-1 bg-transparent border border-gray-800 rounded-full px-3 py-1.5 text-xs text-gray-300 hover:border-gray-600 hover:text-white transition-colors truncate min-w-0">
                         <span id="compareRightLabelText" class="truncate">Select endpoint...</span>
                     </button>
                     <select id="compareRightModel"
-                            class="hidden bg-transparent border border-gray-800 rounded-md px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500 min-w-0">
+                            class="hidden bg-transparent border border-gray-800 rounded-full px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-amber-500 min-w-0">
                     </select>
                     <span id="compareRightKeyStatus" class="text-[10px] hidden shrink-0"></span>
                 </div>
@@ -71,7 +74,7 @@
 
     <!-- Progress bar (top offset adjusts dynamically via JS) -->
     <div id="progressBar" class="fixed left-0 right-0 z-30 hidden overflow-hidden" style="top: 96px;">
-        <div class="h-0.5 bg-blue-500 animate-progress"></div>
+        <div class="h-0.5 bg-amber-500 animate-progress"></div>
     </div>
 
     <!-- Main centered column -->
@@ -79,7 +82,7 @@
 
         <!-- Welcome state (shown when no endpoint is loaded) -->
         <div id="welcomeState" class="flex flex-col items-center justify-center text-center" style="min-height: calc(100vh - 10rem);">
-            <h1 class="text-4xl font-bold text-white tracking-tight mb-3">arcade</h1>
+            <h1 class="text-4xl font-bold text-white tracking-tight mb-3 font-brand">arcade</h1>
             <p class="text-sm text-gray-500 mb-8">An AI playground for every provider</p>
             <button onclick="openPalette()"
                     class="flex items-center gap-3 bg-gray-900 border border-gray-700 hover:border-gray-500 rounded-lg px-5 py-3 text-sm text-gray-300 hover:text-white transition-colors shadow-lg">
@@ -95,7 +98,10 @@
         <!-- Endpoint info -->
         <div id="playground" class="hidden">
             <div class="mb-8">
-                <h2 id="endpointName" class="text-lg font-light text-white mb-1"></h2>
+                <div class="flex items-center gap-2.5 mb-1">
+                    <img id="endpointFavicon" class="w-5 h-5 hidden rounded-sm" src="" alt="">
+                    <h2 id="endpointName" class="text-lg font-light text-white"></h2>
+                </div>
                 <p id="endpointDescription" class="text-sm text-gray-500"></p>
                 <p id="baseUrl" class="text-xs text-gray-600 font-mono mt-1 hidden"></p>
             </div>
@@ -112,7 +118,7 @@
                     System prompt
                 </button>
                 <textarea id="systemPromptInput"
-                          class="w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-blue-500 resize-y hidden"
+                          class="w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-amber-500 resize-y hidden"
                           rows="3" placeholder="You are a helpful assistant..."></textarea>
             </div>
 
@@ -135,18 +141,18 @@
             <p id="compareWarning" class="hidden mt-4 text-xs text-amber-400 border border-amber-900/50 rounded-md px-3 py-2"></p>
 
             <!-- Generate button + curl -->
-            <div class="mt-6 flex items-center justify-between">
+            <div class="mt-6 flex items-center gap-3">
                 <button id="generateBtn" onclick="onGenerate()"
-                        class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors">
+                        class="flex-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]">
                     Generate
                 </button>
                 <button id="curlPreviewBtn" onclick="openCurlModal()"
-                        class="bg-yellow-500/15 hover:bg-yellow-500/25 text-yellow-400 text-xs font-medium px-3 py-1.5 rounded-full transition-colors">curl</button>
+                        class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-medium px-3 py-2.5 rounded-md transition-colors font-brand">curl</button>
             </div>
         </div>
 
         <!-- Play mode Results -->
-        <div id="results" class="hidden mt-10">
+        <div id="results" class="hidden mt-10 result-area">
             <!-- Tabs -->
             <div class="flex items-center gap-0 mb-4 border-b border-gray-800">
                 <button onclick="switchResultTab('play','result')" data-tab="result"
@@ -174,14 +180,14 @@
                             <h4 class="text-xs text-gray-600 uppercase tracking-wider">Response</h4>
                             <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
                         </div>
-                        <pre class="json-response bg-gray-900 rounded-md p-3 text-xs text-blue-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                        <pre class="json-response bg-gray-900 rounded-md p-3 text-xs text-amber-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Compare mode Results -->
-        <div id="compareResults" class="hidden mt-10">
+        <div id="compareResults" class="hidden mt-10 result-area">
             <!-- Tabs -->
             <div class="flex items-center gap-0 mb-4 border-b border-gray-800">
                 <button onclick="switchResultTab('compare','result')" data-tab="result"
@@ -239,7 +245,7 @@
                                     <h4 class="text-xs text-gray-600 uppercase tracking-wider">Response</h4>
                                     <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
                                 </div>
-                                <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                                <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-amber-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
                             </div>
                         </div>
                     </div>
@@ -259,7 +265,7 @@
                                     <h4 class="text-xs text-gray-600 uppercase tracking-wider">Response</h4>
                                     <button onclick="copyJsonPre(this)" class="text-xs text-gray-600 hover:text-gray-300 transition-colors">Copy</button>
                                 </div>
-                                <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-blue-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                                <pre class="json-response bg-gray-900 rounded-md p-2 text-xs text-amber-400/80 overflow-x-auto max-h-96 overflow-y-auto"></pre>
                             </div>
                         </div>
                     </div>
@@ -282,7 +288,7 @@
         <div id="curlModalPanel" class="relative bg-gray-900 border border-gray-700 rounded-lg shadow-2xl mx-4 max-h-[80vh] flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-                <span class="text-xs text-yellow-400 uppercase tracking-wider font-medium">curl</span>
+                <span class="text-xs text-amber-400 uppercase tracking-wider font-medium font-brand">curl</span>
                 <div class="flex items-center gap-2">
                     <!-- Single copy (play mode only) -->
                     <button onclick="copyCurl('play')" id="curlCopyBtnPlay"
@@ -293,7 +299,7 @@
             </div>
             <!-- Play mode: single column -->
             <div id="curlPlayBody" class="hidden overflow-auto p-4">
-                <pre id="curlPlayContent" class="text-xs text-yellow-400/80 whitespace-pre-wrap break-all"></pre>
+                <pre id="curlPlayContent" class="text-xs text-amber-400/80 whitespace-pre-wrap break-all"></pre>
             </div>
             <!-- Compare mode: two columns -->
             <div id="curlCompareBody" class="hidden overflow-auto p-4">
@@ -304,7 +310,7 @@
                             <button onclick="copyCurl('left')" id="curlCopyBtnLeft"
                                     class="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded transition-colors">Copy</button>
                         </div>
-                        <pre id="curlLeftContent" class="text-xs text-yellow-400/80 whitespace-pre-wrap break-all bg-gray-950/50 rounded-md p-3"></pre>
+                        <pre id="curlLeftContent" class="text-xs text-amber-400/80 whitespace-pre-wrap break-all bg-gray-950/50 rounded-md p-3"></pre>
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-2">
@@ -312,7 +318,7 @@
                             <button onclick="copyCurl('right')" id="curlCopyBtnRight"
                                     class="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded transition-colors">Copy</button>
                         </div>
-                        <pre id="curlRightContent" class="text-xs text-yellow-400/80 whitespace-pre-wrap break-all bg-gray-950/50 rounded-md p-3"></pre>
+                        <pre id="curlRightContent" class="text-xs text-amber-400/80 whitespace-pre-wrap break-all bg-gray-950/50 rounded-md p-3"></pre>
                     </div>
                 </div>
             </div>
@@ -342,7 +348,7 @@
     <!-- Command palette -->
     <div id="cmdPalette" class="hidden fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
         <div class="absolute inset-0 bg-black/60" id="cmdPaletteBackdrop"></div>
-        <div class="relative bg-gray-900 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4 flex flex-col overflow-hidden" style="max-height: 60vh;">
+        <div class="relative bg-gray-900 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4 flex flex-col overflow-hidden palette-panel" style="max-height: 60vh;">
             <!-- Search input -->
             <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
                 <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

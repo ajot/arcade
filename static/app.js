@@ -37,7 +37,6 @@ let paletteStep = 'endpoint'; // 'endpoint' | 'model'
 let palettePendingDefId = null; // Definition ID chosen in step 1
 let palettePendingDef = null; // Full definition object (fetched)
 let palettePendingIsCompare = false; // Whether Shift was held in step 1
-let paletteModelItems = []; // Model options for step 2
 
 function createSlot() {
     return {
@@ -831,15 +830,44 @@ async function loadCompareEndpoint(side, defId) {
     updateCompareForm();
 }
 
+function getProviderFaviconUrl(def) {
+    const providerUrl = def && def.provider_url;
+    if (!providerUrl) return null;
+    return 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(providerUrl) + '&sz=32';
+}
+
 function updateEndpointLabel() {
     const label = document.getElementById('endpointLabelText');
+    const btn = document.getElementById('endpointLabelBtn');
     if (!label) return;
     const def = slots.play.definition;
     if (def) {
+        const faviconUrl = getProviderFaviconUrl(def);
+        // Add favicon before text in the button
+        let existingImg = btn.querySelector('.endpoint-label-favicon');
+        if (faviconUrl) {
+            if (!existingImg) {
+                existingImg = document.createElement('img');
+                existingImg.className = 'endpoint-label-favicon w-4 h-4 rounded-sm';
+                btn.insertBefore(existingImg, label);
+            }
+            existingImg.src = faviconUrl;
+        } else if (existingImg) {
+            existingImg.remove();
+        }
         label.textContent = def.name;
     } else {
+        const existingImg = btn.querySelector('.endpoint-label-favicon');
+        if (existingImg) existingImg.remove();
         label.textContent = 'Select an endpoint...';
     }
+}
+
+function goHome(e) {
+    if (e) e.preventDefault();
+    abortAllSlots();
+    if (mode === 'compare') setMode('play');
+    loadPlayEndpoint(null);
 }
 
 function updateCompareEndpointLabel(side) {
@@ -929,6 +957,18 @@ function renderForm(definition) {
     document.getElementById('endpointName').textContent = definition.name;
     document.getElementById('endpointDescription').textContent = definition.description || '';
 
+    // Show provider favicon in endpoint header
+    const favicon = document.getElementById('endpointFavicon');
+    const faviconUrl = getProviderFaviconUrl(definition);
+    if (favicon) {
+        if (faviconUrl) {
+            favicon.src = faviconUrl;
+            favicon.classList.remove('hidden');
+        } else {
+            favicon.classList.add('hidden');
+        }
+    }
+
     const container = document.getElementById('formFields');
     container.innerHTML = '';
 
@@ -940,7 +980,7 @@ function renderForm(definition) {
         for (const example of definition.examples) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-colors';
+            btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-all active:scale-95';
             btn.textContent = example.label;
             btn.onclick = () => fillExample(example.params);
             exBtns.appendChild(btn);
@@ -950,10 +990,14 @@ function renderForm(definition) {
         exRow.classList.add('hidden');
     }
 
+    let staggerIndex = 0;
     for (const param of definition.request.params) {
         if (param.name === 'model' && param.ui === 'dropdown') continue;
         const field = createField(param);
+        field.classList.add('field-stagger');
+        field.style.animationDelay = `${staggerIndex * 50}ms`;
         container.appendChild(field);
+        staggerIndex++;
     }
 }
 
@@ -980,29 +1024,31 @@ function createField(param) {
     const wrapper = document.createElement('div');
 
     const label = document.createElement('label');
-    label.className = 'block text-xs text-gray-500 mb-1.5';
+    label.className = 'block text-xs text-gray-400 mb-1.5';
     label.textContent = param.name;
     if (param.required) {
         const star = document.createElement('span');
-        star.className = 'text-blue-500 ml-0.5';
+        star.className = 'text-amber-500 ml-0.5';
         star.textContent = '*';
         label.appendChild(star);
     }
     wrapper.appendChild(label);
 
     let input;
+    const isPrimaryTextarea = param.ui === 'textarea' && param.body_path === '_chat_message';
 
     switch (param.ui) {
         case 'textarea':
             input = document.createElement('textarea');
-            input.rows = 3;
+            input.rows = isPrimaryTextarea ? 4 : 3;
             input.placeholder = param.placeholder || '';
-            input.className = 'w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-blue-500 resize-y';
+            input.className = 'w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-amber-500 resize-y'
+                + (isPrimaryTextarea ? ' textarea-primary' : '');
             break;
 
         case 'dropdown':
             input = document.createElement('select');
-            input.className = 'w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500';
+            input.className = 'w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500';
             for (const opt of (param.options || [])) {
                 const option = document.createElement('option');
                 option.value = opt;
@@ -1022,9 +1068,9 @@ function createField(param) {
             range.max = param.max || 100;
             range.value = param.default || param.min || 0;
             range.step = param.type === 'float' ? '0.1' : '1';
-            range.className = 'flex-1 accent-blue-500';
+            range.className = 'flex-1 accent-amber-500';
             const valueDisplay = document.createElement('span');
-            valueDisplay.className = 'text-xs text-gray-500 w-12 text-right font-mono';
+            valueDisplay.className = 'text-xs text-gray-400 w-12 text-right font-brand';
             valueDisplay.textContent = range.value;
             range.oninput = () => { valueDisplay.textContent = range.value; };
             range.dataset.paramName = param.name;
@@ -1038,7 +1084,7 @@ function createField(param) {
             input = document.createElement('input');
             input.type = 'text';
             input.placeholder = param.placeholder || '';
-            input.className = 'w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-blue-500';
+            input.className = 'w-full bg-transparent border border-gray-800 rounded-md px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-amber-500';
             break;
     }
 
@@ -1496,13 +1542,16 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeCurlModal();
 });
 
+function showCopySuccess(btn) {
+    const original = btn.innerHTML;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;color:#34d399"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(() => { btn.innerHTML = original; }, 1500);
+}
+
 function copyJsonPre(btn) {
     const pre = btn.closest('div').nextElementSibling;
     if (!pre) return;
-    navigator.clipboard.writeText(pre.textContent).then(() => {
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-    });
+    navigator.clipboard.writeText(pre.textContent).then(() => showCopySuccess(btn));
 }
 
 function copyCurl(target) {
@@ -1518,10 +1567,7 @@ function copyCurl(target) {
         btn = document.getElementById('curlCopyBtnRight');
     }
     if (!text || !btn) return;
-    navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-    });
+    navigator.clipboard.writeText(text).then(() => showCopySuccess(btn));
 }
 
 function collectCompareParams(slotId) {
@@ -1645,7 +1691,7 @@ function renderMetrics(metrics, container) {
     if (metrics.submitTime != null) parts.push(`Submit: ${metrics.submitTime.toFixed(0)}ms`);
     if (parts.length === 0) return;
     const span = document.createElement('span');
-    span.className = 'text-[11px] text-gray-500 font-mono';
+    span.className = 'text-[11px] text-gray-500 font-brand';
     span.textContent = parts.join('  \u00b7  ');
     container.appendChild(span);
 }
@@ -1659,12 +1705,12 @@ function setGenerating(active) {
     if (active) {
         btn.disabled = true;
         btn.innerHTML = '<span class="btn-spinner"></span>Generating';
-        btn.className = 'bg-gray-700 text-gray-400 text-sm font-medium px-5 py-2 rounded-md cursor-not-allowed';
+        btn.className = 'flex-1 bg-gray-700 text-gray-400 text-sm font-semibold py-2.5 rounded-md cursor-not-allowed';
         showProgress();
     } else {
         btn.disabled = false;
         btn.textContent = 'Generate';
-        btn.className = 'bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors';
+        btn.className = 'flex-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]';
         hideProgress();
     }
 }
@@ -1813,11 +1859,11 @@ function checkCompareCompatibility() {
             warning.classList.remove('hidden');
         }
         btn.disabled = true;
-        btn.className = 'bg-gray-700 text-gray-400 text-sm font-medium px-5 py-2 rounded-md cursor-not-allowed';
+        btn.className = 'flex-1 bg-gray-700 text-gray-400 text-sm font-semibold py-2.5 rounded-md cursor-not-allowed';
     } else {
         if (warning) warning.classList.add('hidden');
         btn.disabled = false;
-        btn.className = 'bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-md transition-colors';
+        btn.className = 'flex-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold py-2.5 rounded-md transition-all hover:scale-[1.005] active:scale-[0.99]';
     }
 }
 
@@ -1914,7 +1960,7 @@ function renderCompareExamples(leftDef, rightDef) {
     for (const example of examples) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-colors';
+        btn.className = 'border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-gray-200 text-xs px-3 py-1 rounded-full transition-all active:scale-95';
         btn.textContent = example.label;
         btn.onclick = () => fillExample(example.params);
         exBtns.appendChild(btn);

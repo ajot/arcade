@@ -1,3 +1,8 @@
+/* Brand font */
+.font-brand {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
 /* Welcome state fade-in */
 #welcomeState {
     animation: fadeIn 0.4s ease-out;
@@ -6,6 +11,12 @@
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Staggered fade-in for form fields */
+.field-stagger {
+    opacity: 0;
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
 /* Progress bar animation */
@@ -25,7 +36,7 @@
 
 /* Log console */
 .log-console {
-    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
     font-size: 11px;
     line-height: 1.6;
 }
@@ -45,8 +56,8 @@
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top-color: rgba(0, 0, 0, 0.7);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
     margin-right: 6px;
@@ -61,7 +72,7 @@
 .streaming-cursor::after {
     content: '\25AE';
     animation: blink 0.8s step-end infinite;
-    color: #60a5fa;
+    color: #f59e0b;
 }
 
 @keyframes blink {
@@ -77,7 +88,7 @@
 /* Form field focus ring */
 select:focus, input:focus, textarea:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: #f59e0b;
 }
 
 /* Tailwind overrides for top bar selects */
@@ -90,13 +101,22 @@ header select {
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
 }
 .result-tab-active {
     color: #e5e7eb;
-    border-bottom-color: #3b82f6;
+    border-bottom-color: #f59e0b;
 }
 .result-tab:not(.result-tab-active):hover {
     color: #9ca3af;
+}
+
+/* Result area styling */
+.result-area {
+    background: rgba(17, 24, 39, 0.4);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    animation: fadeIn 0.3s ease-out;
 }
 
 /* Compare mode columns */
@@ -111,6 +131,22 @@ header select {
 @media (max-width: 768px) {
     .compare-grid {
         grid-template-columns: 1fr !important;
+    }
+}
+
+/* Command palette animation */
+.palette-panel {
+    animation: paletteIn 0.15s ease-out;
+}
+
+@keyframes paletteIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98) translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
     }
 }
 
@@ -135,7 +171,7 @@ header select {
 
 #cmdPaletteList .palette-item:hover,
 #cmdPaletteList .palette-item.palette-highlighted {
-    background-color: rgba(59, 130, 246, 0.15);
+    background-color: rgba(245, 158, 11, 0.1);
 }
 
 #cmdPaletteList .palette-item .palette-item-name {
@@ -146,7 +182,7 @@ header select {
 #cmdPaletteList .palette-item .palette-item-model {
     font-size: 11px;
     color: #6b7280;
-    font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', monospace;
 }
 
 #cmdPaletteList .palette-item .palette-item-left {
@@ -179,7 +215,7 @@ header select {
 }
 
 #cmdPaletteList .palette-item .palette-bookmark-star {
-    color: #eab308;
+    color: #f59e0b;
     margin-right: 6px;
     font-size: 12px;
 }
@@ -238,7 +274,7 @@ header select {
     width: 16px;
     height: 16px;
     border: 2px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #60a5fa;
+    border-top-color: #f59e0b;
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
 }
@@ -256,5 +292,12 @@ header select {
 }
 
 #cmdPaletteList .palette-bookmark-save-input:focus {
-    border-color: #3b82f6;
+    border-color: #f59e0b;
+}
+
+/* Primary textarea visual priority */
+.textarea-primary {
+    background: rgba(17, 24, 39, 0.5);
+    border-left: 2px solid #f59e0b;
+    padding-left: 14px;
 }
