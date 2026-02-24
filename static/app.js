@@ -54,11 +54,6 @@ let slots = {
     right: createSlot(),
 };
 
-// Backward-compat getter for play slot
-function getCurrentDefinition() {
-    return mode === 'play' ? slots.play.definition : null;
-}
-
 // ---------------------------------------------------------------------------
 // DOM helpers — map slot to containers
 // ---------------------------------------------------------------------------
@@ -257,7 +252,6 @@ function closePalette() {
     palettePendingDefId = null;
     palettePendingDef = null;
     palettePendingIsCompare = false;
-    paletteModelItems = [];
     document.getElementById('cmdPalette').classList.add('hidden');
     document.getElementById('cmdPaletteInput').value = '';
     document.getElementById('cmdPaletteBreadcrumb').classList.add('hidden');
@@ -380,7 +374,7 @@ function renderPaletteList(query) {
     }
 
     // --- Endpoint sections grouped by output_type, validated first ---
-    let filtered = getFilteredDefinitions();
+    let filtered = DEFINITIONS_LIST;
     if (q) {
         filtered = filtered.filter(d => {
             const searchStr = [d.name, d.provider, PROVIDER_NAMES[d.provider] || '', d.output_type || ''].join(' ').toLowerCase();
@@ -728,7 +722,6 @@ function paletteGoBack() {
         palettePendingDefId = null;
         palettePendingDef = null;
         palettePendingIsCompare = false;
-        paletteModelItems = [];
         const input = document.getElementById('cmdPaletteInput');
         input.value = '';
         renderPaletteList('');
@@ -1822,11 +1815,6 @@ function hideModelPicker() {
     document.getElementById('modelPickerGroup').classList.add('hidden');
     document.getElementById('modelPicker').innerHTML = '';
 }
-
-function getFilteredDefinitions() {
-    return DEFINITIONS_LIST;
-}
-
 
 // ---------------------------------------------------------------------------
 // Compare mode — output type and compatibility
